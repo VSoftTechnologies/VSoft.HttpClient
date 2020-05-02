@@ -1,0 +1,97 @@
+{
+   "metadata":{
+      "id":"VSoft.HttpClient",
+      "version":"0.0.1",
+      "description":"Enables cooperative cancellation between threads",
+      "authors":"Vincent Parrett",
+      "projectUrl":"https://github.com/VSoftTechnologies/VSoft.HttpClient",
+      "license":"Apache-2.0",
+      "copyright":"Vincent Parrett and contributors",
+      "tags":"http client winhttp"
+   },
+   "targetPlatforms":[
+      {
+         "compiler":"XE2",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"XE3",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"XE4",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"XE5",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"XE6",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"XE7",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"XE8",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"10.0",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"10.1",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"10.2",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"10.3",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      },
+      {
+         "compiler":"10.4",
+         "platforms":"Win32, Win64",
+         "template":"default"
+      }
+   ],
+   "templates":[
+      {
+         "name":"default",
+         "dependencies":[
+            {
+               "id":"VSoft.CancellationToken",
+               "version":"[0.0.1,]"
+            }
+         ],
+         "source":[
+            {
+               "src":"source\\*.pas",
+               "flatten":true,
+               "dest":"src"
+            }
+         ],
+         "searchPaths":[
+            {
+               "path":"src"
+            }
+         ]
+      }
+   ]
+}
