@@ -162,10 +162,18 @@ end;
 procedure THttpResponse.SetContent(const stream: IStream);
 var
   adapter : IStream;
+  {$IF CompilerVersion >= 29.0}
+  bytesRead, bytesWritten : UInt64;
+  {$ELSE}
   bytesRead, bytesWritten : Int64;
+  {$IFEND}
 begin
   adapter := TStreamAdapter.Create(FStream) as IStream;
+  {$IF CompilerVersion >= 29.0}
+  stream.CopyTo(adapter, High(UInt64), bytesRead, bytesWritten);
+  {$ELSE}
   stream.CopyTo(adapter, High(Int64), bytesRead, bytesWritten);
+  {$IFEND}
   FStream.Position := 0;
 end;
 
