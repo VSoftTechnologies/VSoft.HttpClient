@@ -58,6 +58,8 @@ type
     function GetContentLength: Int64;
     procedure SetContent(const stream: IStream);
     function GetErrorMessage: string;
+    function HttpResultString : string;
+    function IsSuccess : boolean;
   public
     constructor Create(const httpResult : integer; const errorMsg : string; const headers : string; const fileName : string);
     destructor Destroy;override;
@@ -77,6 +79,9 @@ var
 begin
   FHttpResult := httpResult;
   FErrorMessage := errorMsg;
+  if not IsSuccess and (FErrorMessage = '') then
+    FErrorMessage := HttpResultString;
+
   FHeaders := TStringList.Create;
   FHeaders.Text := headers;
   for i := 0 to FHeaders.Count -1 do
@@ -157,6 +162,58 @@ end;
 function THttpResponse.GetResponseStream: TStream;
 begin
   result := FStream;
+end;
+
+function THttpResponse.HttpResultString: string;
+begin
+  case FHttpResult of
+    100 : result := 'Continue';
+    101 : result := 'Switching Protocols';
+    200 : result:= 'OK';
+    201 : result:= 'Created';
+    202 : result:= 'Accepted';
+    203 : result:= 'Non-Authoritative Information';
+    204 : result:= 'No Content';
+    205 : result:= 'Reset Content';
+    206 : result:= 'Partial Content';
+    300 : result:= 'Multiple Choices';
+    301 : result:= 'Moved Permanently';
+    302 : result:= 'Moved Temporarily';
+    303 : result:= 'See Other';
+    304 : result:= 'Not Modified';
+    305 : result:= 'Use Proxy';
+    400 : result:= 'Bad Request';
+    401 : result:= 'Unauthorized';
+    402 : result:= 'Payment Required';
+    403 : result:= 'Forbidden';
+    404 : result:= 'Not Found';
+    405 : result:= 'Method Not Allowed';
+    406 : result:= 'Not Acceptable';
+    407 : result:= 'Proxy Authentication Required';
+    408 : result:= 'Request Time-out';
+    409 : result:= 'Conflict';
+    410 : result:= 'Gone';
+    411 : result:= 'Length Required';
+    412 : result:= 'Precondition Failed';
+    413 : result:= 'Request Entity Too Large';
+    414 : result:= 'Request-URI Too Large';
+    415 : result:= 'Unsupported Media Type';
+    500 : result:= 'Internal Server Error';
+    501 : result:= 'Not Implemented';
+    502 : result:= 'Bad Gateway';
+    503 : result:= 'Service Unavailable';
+    504 : result:= 'Gateway Time-out';
+    505 : result:= 'HTTP Version not supported';
+  else
+  begin
+    result := 'Unknown error.'
+  end;
+ end;
+end;
+
+function THttpResponse.IsSuccess: boolean;
+begin
+  result := FHttpResult = 200;
 end;
 
 procedure THttpResponse.SetContent(const stream: IStream);
