@@ -3,7 +3,7 @@
 {           VSoft.HttpClient - A wrapper over WinHttp                       }
 {                              modelled on restSharp                        }
 {                                                                           }
-{           Copyright � 2020 Vincent Parrett and contributors               }
+{           Copyright © 2020 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -320,10 +320,11 @@ begin
   response := THttpResponse.Create(httpResult, FError,  FWinHttpRequest.GetAllResponseHeaders, request.SaveAsFile);
   result := response;
 
-  if httpResult = HTTP_OK then
-  begin
+  try
     responseStream := IUnknown(FWinHttpRequest.ResponseStream) as IStream;
     response.SetContent(responseStream);
+  except
+    //ignore any error here.. not actually seen an error
   end;
 end;
 
@@ -369,10 +370,11 @@ begin
   response := THttpResponse.Create(httpResult, FError, FWinHttpRequest.GetAllResponseHeaders, request.SaveAsFile);
   result := response;
 
-  if httpResult = HTTP_OK then
-  begin
+  try
     responseStream := IUnknown(FWinHttpRequest.ResponseStream) as IStream;
     response.SetContent(responseStream);
+  except
+    //ignore any error here.. not actually seen an error
   end;
 end;
 

@@ -3,7 +3,7 @@
 {           VSoft.HttpClient - A wrapper over WinHttp                       }
 {                              modelled on restSharp                        }
 {                                                                           }
-{           Copyright � 2020 Vincent Parrett and contributors               }
+{           Copyright © 2020 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -239,6 +239,8 @@ var
   bytesRead, bytesWritten : Int64;
   {$IFEND}
 begin
+  if stream = nil then
+    exit;
   adapter := TStreamAdapter.Create(FStream) as IStream;
   {$IF CompilerVersion >= 29.0}
   stream.CopyTo(adapter, High(UInt64), bytesRead, bytesWritten);
