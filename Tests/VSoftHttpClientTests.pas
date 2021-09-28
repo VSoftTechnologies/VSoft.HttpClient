@@ -31,11 +31,15 @@ var
   response : IHttpResponse;
   i : integer;
 begin
-  client := THttpClientFactory.CreateClient('http://localhost:55542');
-  request := THttpClientFactory.CreateRequest('weatherforecast');
+  client := THttpClientFactory.CreateClient('https://localhost:5001/api/v1/index.json');
+  request := THttpClientFactory.CreateRequest('');
   request.AddParameter('name', 'the value');
 
   response := client.Get(request);
+
+  if response.ResponseCode <> 200 then
+    WriteLn(response.ErrorMessage);
+
 
   Assert.AreEqual<integer>(200, response.ResponseCode);
   Assert.AreNotEqual<integer>(0, response.ContentLength);

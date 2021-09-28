@@ -213,7 +213,8 @@ begin
       end;
     end;
   end;
-
+  FError := '' ;
+  FErrorCode := 0;
   case request.HttpMethod of
     THttpMethod.GET    : result := DoGet(request, cancellationToken);
     THttpMethod.POST   : result := DoPost(request, cancellationToken);
@@ -294,6 +295,7 @@ var
   response : IHttpResponseInternal;
   waitHandles : array[0..1] of THandle;
   waitRes : integer;
+  sHeaders : string;
 begin
   result := nil;
 
@@ -313,16 +315,32 @@ begin
       DisconnectEvents;
       exit;
     end;
+    if FErrorCode = 0 then
+      httpResult := FWinHttpRequest.Status
+    else
+      httpResult := FErrorCode;
+  end
+  else
+  begin
+    httpResult := FWinHttpRequest.Status;
+    FError := FWinHttpRequest.StatusText;
   end;
 
-  httpResult := FWinHttpRequest.Status;
+  if httpResult > 0 then
+    sHeaders := FWinHttpRequest.GetAllResponseHeaders;
 
-  response := THttpResponse.Create(httpResult, FError,  FWinHttpRequest.GetAllResponseHeaders, request.SaveAsFile);
+  response := THttpResponse.Create(httpResult, FError,  sHeaders, request.SaveAsFile);
   result := response;
 
   try
-    responseStream := IUnknown(FWinHttpRequest.ResponseStream) as IStream;
-    response.SetContent(responseStream);
+    if httpResult > 0 then
+    begin
+      responseStream := IUnknown(FWinHttpRequest.ResponseStream) as IStream;
+      response.SetContent(responseStream);
+    end
+    else
+      response.SetContent(nil);
+
   except
     //ignore any error here.. not actually seen an error
   end;
@@ -336,6 +354,7 @@ var
   waitHandles : array[0..1] of THandle;
   waitRes : integer;
   body : IStream;
+  sHeaders : string;
 begin
   result := nil;
   body := request.GetBody;
@@ -363,16 +382,29 @@ begin
       DisconnectEvents;
       exit;
     end;
+    if FErrorCode = 0 then
+      httpResult := FWinHttpRequest.Status
+    else
+      httpResult := FErrorCode;
+  end
+  else
+  begin
+    httpResult := FWinHttpRequest.Status;
+    FError := FWinHttpRequest.StatusText;
   end;
 
-  httpResult := FWinHttpRequest.Status;
-  FError := FWinHttpRequest.StatusText;
-  response := THttpResponse.Create(httpResult, FError, FWinHttpRequest.GetAllResponseHeaders, request.SaveAsFile);
+  if httpResult > 0 then
+    sHeaders := FWinHttpRequest.GetAllResponseHeaders;
+
+  response := THttpResponse.Create(httpResult, FError,  sHeaders, request.SaveAsFile);
   result := response;
 
   try
-    responseStream := IUnknown(FWinHttpRequest.ResponseStream) as IStream;
-    response.SetContent(responseStream);
+    if httpResult > 0 then
+    begin
+      responseStream := IUnknown(FWinHttpRequest.ResponseStream) as IStream;
+      response.SetContent(responseStream);
+    end;
   except
     //ignore any error here.. not actually seen an error
   end;
