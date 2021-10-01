@@ -50,6 +50,7 @@ type
     FSaveAsFile : string;
     FEncoding : TEncoding;
     FForceFormData : boolean;
+	  FFollowRedirects : boolean;
   protected
     function GetAuthorization: string;
     function GetBodyAsString: string;
@@ -66,6 +67,7 @@ type
     function GetUserAgent : string;
     function GetUrlSegments : TStrings;
     function GetForceFormData : boolean;
+    function GetFollowRedirects : boolean;
 
     procedure SetAccept(const value: string);
     procedure SetAcceptCharSet(const value: string);
@@ -85,6 +87,7 @@ type
     procedure SetUrlSegments(const value : TStrings);
     procedure SetForceFormData(const value : boolean);
 
+    procedure SetFollowRedirects(const value : boolean);
     function GetSaveAsFile: string;
     procedure SetSaveAsFile(const value: string);
     function GetCharSet : string;
@@ -204,6 +207,7 @@ begin
   FResource := resource;
   FContent := nil;
   FOwnsContent := false;
+  FFollowRedirects := true;
 
 end;
 
@@ -333,6 +337,11 @@ end;
 function THttpRequest.GetFiles: TStrings;
 begin
   result := FFiles;
+end;
+
+function THttpRequest.GetFollowRedirects: boolean;
+begin
+  result := FFollowRedirects;
 end;
 
 function THttpRequest.GetForceFormData: boolean;
@@ -472,6 +481,11 @@ end;
 procedure THttpRequest.SetFiles(const value: TStrings);
 begin
   FFiles.Assign(value);
+end;
+
+procedure THttpRequest.SetFollowRedirects(const value: boolean);
+begin
+  FFollowRedirects := value;
 end;
 
 procedure THttpRequest.SetForceFormData(const value: boolean);

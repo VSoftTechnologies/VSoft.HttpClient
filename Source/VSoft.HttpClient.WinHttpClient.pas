@@ -171,6 +171,7 @@ var
   async : boolean;
 begin
   CreateWinHttpRequest;
+  FWinHttpRequest.Option[WinHttpRequestOption_EnableRedirects] := request.FollowRedirects;
   result := nil;
   sUrl := UrlFromRequest(request);
 

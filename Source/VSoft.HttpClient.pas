@@ -97,6 +97,10 @@ type
     function GetForceFormData : boolean;
     procedure SetForceFormData(const value : boolean);
 
+    function GetFollowRedirects : boolean;
+    procedure SetFollowRedirects(const value : boolean);
+
+
     function GetBodyAsString : string;
     function GetCharSet : string;
 
@@ -135,6 +139,7 @@ type
 
     property Authorization : string read GetAuthorization write SetAuthorization;
     property Headers : TStrings read GetHeaders write SetHeaders;
+    property FollowRedirects : boolean read GetFollowRedirects write SetFollowRedirects;
     property Files : TStrings read GetFiles write SetFiles;
     property HttpMethod  : THttpMethod read GetHttpMethod write SetHttpMethod;
     property Resource : string read GetResource write SetResource;
