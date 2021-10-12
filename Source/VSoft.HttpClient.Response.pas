@@ -47,6 +47,7 @@ type
     FHttpResult : integer;
     FFileName : string;
     FErrorMessage : string;
+    FContentDisposition : IContentDisposition;
   protected
     function GetContentType: string;
     function GetHeaders: TStrings;
@@ -56,10 +57,12 @@ type
     function GetResponseStream: TStream;
     function GetFileName : string;
     function GetContentLength: Int64;
+    function GetContentDisposition : IContentDisposition;
     procedure SetContent(const stream: IStream);
     function GetErrorMessage: string;
     function HttpResultString : string;
     function IsSuccess : boolean;
+    procedure SaveTo(const folderName :string; const fileName : string = '');
   public
     constructor Create(const httpResult : integer; const errorMsg : string; const headers : string; const fileName : string);
     destructor Destroy;override;
@@ -69,11 +72,13 @@ type
 implementation
 
 uses
-  System.SysUtils;
+  System.IOUtils,
+  System.SysUtils,
+  VSoft.HttpClient.Headers;
 
 { THttpResponse }
 
-constructor THttpResponse.Create(const httpResult: integer; const errorMsg : string; const headers : string; const fileName : string);
+constructor THttpResponse.Create(const httpResult: integer; const errorMsg : string; const headers : string;const fileName : string);
 var
   i: Integer;
 begin
@@ -90,19 +95,30 @@ begin
     FHeaders[i] := Trim(FHeaders.Names[i]) + '=' + Trim(FHeaders.ValueFromIndex[i]);
   end;
 
+  FContentDisposition := nil;
 
+  if FHeaders.IndexOfName('Content-Disposition') <> -1 then
+  begin
+    FContentDisposition := TContentDisposition.Create(FHeaders.Values['Content-Disposition']);
+  end;
+
+  FFileName := fileName;
+  //TODO : if contentdisposition says it's a file, create a temp filestream.
   if fileName <> '' then
     FStream := TFileStream.Create(fileName, fmCreate)
   else
     FStream := TMemoryStream.Create;
-
-
 end;
 
 destructor THttpResponse.Destroy;
 begin
   FStream.Free;
   inherited;
+end;
+
+function THttpResponse.GetContentDisposition: IContentDisposition;
+begin
+  result := FContentDisposition;
 end;
 
 function THttpResponse.GetContentLength: Int64;
@@ -122,7 +138,10 @@ end;
 
 function THttpResponse.GetFileName: string;
 begin
-  result := FFileName;
+  if FFileName <> '' then
+    result :=  FFileName
+  else if FContentDisposition <> nil then
+    FFileName := FContentDisposition.FileName;
 end;
 
 function THttpResponse.GetHeaders: TStrings;
@@ -137,7 +156,7 @@ end;
 
 function THttpResponse.GetIsStringResponse: Boolean;
 begin
-  result := FFileName = ''; //TODO : use content-type too
+  result := (FContentDisposition = nil) and (FContentDisposition.FileName = '');
 end;
 
 function THttpResponse.GetResponse: string;
@@ -228,6 +247,32 @@ end;
 function THttpResponse.IsSuccess: boolean;
 begin
   result := FHttpResult = 200;
+end;
+
+procedure THttpResponse.SaveTo(const folderName, fileName: string);
+var
+  targetFileName : string;
+  fs : TFileStream;
+begin
+  if fileName <> '' then
+    targetFileName := fileName
+  else if (FContentDisposition <> nil) then
+    targetFileName := FContentDisposition.FileName;
+  if targetFileName = '' then
+    raise EArgumentException.Create('Filename parameter is empty and content-disposition header did not provide a filename');
+
+  FStream.Seek32(0, TSeekOrigin.soBeginning);
+
+  targetFileName := TPath.Combine(folderName, targetFileName);
+
+  ForceDirectories(folderName);
+
+  fs := TFileStream.Create(targetFileName, fmCreate);
+  try
+    fs.CopyFrom(FStream);
+  finally
+    fs.Free;
+  end;
 end;
 
 procedure THttpResponse.SetContent(const stream: IStream);

@@ -1,7 +1,7 @@
 {
    "metadata":{
       "id":"VSoft.HttpClient",
-      "version":"0.3.0",
+      "version":"0.4.0",
       "description":"Enables cooperative cancellation between threads",
       "authors":"Vincent Parrett",
       "projectUrl":"https://github.com/VSoftTechnologies/VSoft.HttpClient",
@@ -71,7 +71,7 @@
          "template":"default"
       },
       {
-         "compiler":"11",
+         "compiler":"11.0",
          "platforms":"Win32, Win64",
          "template":"default"
       }

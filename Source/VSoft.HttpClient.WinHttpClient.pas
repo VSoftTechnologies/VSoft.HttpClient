@@ -330,7 +330,7 @@ begin
   if httpResult > 0 then
     sHeaders := FWinHttpRequest.GetAllResponseHeaders;
 
-  response := THttpResponse.Create(httpResult, FError,  sHeaders, request.SaveAsFile);
+  response := THttpResponse.Create(httpResult, FError,  sHeaders, request.SaveAsFile );
   result := response;
 
   try

@@ -93,6 +93,7 @@
         <DCCReference Include="..\..\Source\VSoft.HttpClient.WinHttp.Api.pas"/>
         <DCCReference Include="..\..\Source\VSoft.HttpClient.WinHttp.pas"/>
         <DCCReference Include="..\..\Source\VSoft.HttpClient.WinHttpClient.pas"/>
+        <DCCReference Include="..\..\Source\VSoft.HttpClient.Headers.pas"/>
         <BuildConfiguration Include="Release">
             <Key>Cfg_2</Key>
             <CfgParent>Base</CfgParent>
@@ -170,6 +171,12 @@
                 </DeployFile>
                 <DeployFile LocalName="$(BDS)\Redist\iossimulator\libpcre.dylib" Class="DependencyModule">
                     <Platform Name="iOSSimulator">
+                        <Overwrite>true</Overwrite>
+                    </Platform>
+                </DeployFile>
+                <DeployFile LocalName="C:\Users\Public\Documents\Embarcadero\Studio\21.0\Bpl\VSoft.HttpClientR270.bpl" Configuration="Debug" Class="ProjectOutput">
+                    <Platform Name="Win32">
+                        <RemoteName>VSoft_HttpClientR.bpl</RemoteName>
                         <Overwrite>true</Overwrite>
                     </Platform>
                 </DeployFile>

@@ -151,6 +151,15 @@ type
     property SaveAsFile : string read GetSaveAsFile write SetSaveAsFile;
   end;
 
+  IContentDisposition = interface
+  ['{BC849CF0-F39F-4258-9964-C6A48FC9F0C2}']
+    function GetDispositionType : string;
+    function GetFileName : string;
+
+    property DispositionType : string read GetDispositionType;
+    property FileName : string read GetFileName;
+  end;
+
 
   IHttpResponse = interface
   ['{CAF07179-6432-4AFA-8157-CC8DE8600EA9}']
@@ -162,11 +171,14 @@ type
     function GetIsStringResponse : boolean;
     function GetFileName : string;
     function GetContentLength : Int64;
+    function GetContentDisposition : IContentDisposition;
     function GetErrorMessage : string;
+    procedure SaveTo(const folderName :string; const fileName : string = '');
 
     //common Response headers
     property ContentType : string read GetContentType;
     property ContentLength : Int64 read GetContentLength;
+    property ContentDisposition : IContentDisposition read GetContentDisposition;
     property ErrorMessage : string read GetErrorMessage;
 
 

@@ -106,6 +106,7 @@
         <DCCReference Include="..\..\Source\VSoft.HttpClient.WinHttp.Api.pas"/>
         <DCCReference Include="..\..\Source\VSoft.HttpClient.WinHttp.pas"/>
         <DCCReference Include="..\..\Source\VSoft.HttpClient.WinHttpClient.pas"/>
+        <DCCReference Include="..\..\Source\VSoft.HttpClient.Headers.pas"/>
         <BuildConfiguration Include="Base">
             <Key>Base</Key>
         </BuildConfiguration>
