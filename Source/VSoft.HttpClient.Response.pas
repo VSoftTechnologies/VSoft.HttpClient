@@ -156,7 +156,9 @@ end;
 
 function THttpResponse.GetIsStringResponse: Boolean;
 begin
-  result := (FContentDisposition = nil) and (FContentDisposition.FileName = '');
+  result := true;
+  if (FContentDisposition <> nil) and (FContentDisposition.FileName = '') then
+    result := false;
 end;
 
 function THttpResponse.GetResponse: string;

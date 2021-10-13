@@ -1,8 +1,8 @@
 {
    "metadata":{
       "id":"VSoft.HttpClient",
-      "version":"0.4.0",
-      "description":"Enables cooperative cancellation between threads",
+      "version":"0.4.1",
+      "description":"WinHttp base http client",
       "authors":"Vincent Parrett",
       "projectUrl":"https://github.com/VSoftTechnologies/VSoft.HttpClient",
       "license":"Apache-2.0",
