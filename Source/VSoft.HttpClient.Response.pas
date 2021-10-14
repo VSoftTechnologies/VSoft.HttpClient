@@ -263,7 +263,7 @@ begin
   if targetFileName = '' then
     raise EArgumentException.Create('Filename parameter is empty and content-disposition header did not provide a filename');
 
-  FStream.Seek32(0, TSeekOrigin.soBeginning);
+  FStream.Seek(0, TSeekOrigin.soBeginning);
 
   targetFileName := TPath.Combine(folderName, targetFileName);
 
@@ -271,7 +271,7 @@ begin
 
   fs := TFileStream.Create(targetFileName, fmCreate);
   try
-    fs.CopyFrom(FStream);
+    fs.CopyFrom(FStream, FStream.Size);
   finally
     fs.Free;
   end;
