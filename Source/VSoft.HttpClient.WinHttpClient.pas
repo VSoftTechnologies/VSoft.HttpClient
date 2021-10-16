@@ -172,6 +172,7 @@ var
 begin
   CreateWinHttpRequest;
   FWinHttpRequest.Option[WinHttpRequestOption_EnableRedirects] := request.FollowRedirects;
+  FWinHttpRequest.SetTimeouts(request.ResolveTimeout, request.ConnectTimeout, request.SendTimeout, request.ReceiveTimeout);
   result := nil;
   sUrl := UrlFromRequest(request);
 

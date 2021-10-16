@@ -51,6 +51,10 @@ type
     FEncoding : TEncoding;
     FForceFormData : boolean;
 	  FFollowRedirects : boolean;
+    FResolveTimeout : integer;
+    FConnectTimeout : integer;
+    FSendTimeout : integer;
+    FReceiveTimeout : integer;
   protected
     function GetAuthorization: string;
     function GetBodyAsString: string;
@@ -68,6 +72,11 @@ type
     function GetUrlSegments : TStrings;
     function GetForceFormData : boolean;
     function GetFollowRedirects : boolean;
+    function GetResolveTimeout : integer;
+    function GetConnectTimeout : integer;
+    function GetSendTimeout : integer;
+    function GetReceiveTimeout : integer;
+
 
     procedure SetAccept(const value: string);
     procedure SetAcceptCharSet(const value: string);
@@ -86,6 +95,13 @@ type
     procedure SetUserAgent(const value : string);
     procedure SetUrlSegments(const value : TStrings);
     procedure SetForceFormData(const value : boolean);
+
+
+    procedure SetResolveTimeout(const value : integer);
+    procedure SetConnectTimeout(const value : integer);
+    procedure SetSendTimeout(const value : integer);
+    procedure SetReceiveTimeout(const value : integer);
+
 
     procedure SetFollowRedirects(const value : boolean);
     function GetSaveAsFile: string;
@@ -209,6 +225,12 @@ begin
   FOwnsContent := false;
   FFollowRedirects := true;
 
+  //defaults from https://docs.microsoft.com/en-us/windows/win32/winhttp/iwinhttprequest-settimeouts
+  //the std defaults are very conservative - changing to lower
+  FResolveTimeout := 0;
+  FConnectTimeout := 20000; //60000;
+  FSendTimeout := 30000; //leaving send higher for uploading files.
+  FReceiveTimeout := 15000;//30000;
 end;
 
 destructor THttpRequest.Destroy;
@@ -329,6 +351,11 @@ begin
     result := '';
 end;
 
+function THttpRequest.GetConnectTimeout: integer;
+begin
+  result := FConnectTimeout;
+end;
+
 function THttpRequest.GetContentType: string;
 begin
   result := FHeaders.Values['Content-Type'];
@@ -388,6 +415,16 @@ begin
 
 end;
 
+function THttpRequest.GetReceiveTimeout: integer;
+begin
+  result := FReceiveTimeout
+end;
+
+function THttpRequest.GetResolveTimeout: integer;
+begin
+  result := FResolveTimeout;
+end;
+
 function THttpRequest.GetResource: string;
 begin
   result := FResource;
@@ -396,6 +433,11 @@ end;
 function THttpRequest.GetSaveAsFile: string;
 begin
   result := FSaveAsFile;
+end;
+
+function THttpRequest.GetSendTimeout: integer;
+begin
+  result := FSendTimeout;
 end;
 
 function THttpRequest.GetUrlSegments: TStrings;
@@ -473,6 +515,14 @@ begin
 end;
 
 
+procedure THttpRequest.SetConnectTimeout(const value: integer);
+begin
+  if value >= 0 then
+    FConnectTimeout := value
+  else
+    raise EArgumentOutOfRangeException.Create('ConnectTimeout cannot be less than zero');
+end;
+
 procedure THttpRequest.SetContentType(const value: string);
 begin
   FHeaders.Values['Content-Type'] := value;
@@ -508,6 +558,22 @@ begin
   FQueryString := value;
 end;
 
+procedure THttpRequest.SetReceiveTimeout(const value: integer);
+begin
+  if value >= 0 then
+    FReceiveTimeout := value
+  else
+    raise EArgumentOutOfRangeException.Create('ReceiveTimeout cannot be less than zero');
+end;
+
+procedure THttpRequest.SetResolveTimeout(const value: integer);
+begin
+  if value >= 0 then
+    FResolveTimeout := value
+  else
+    raise EArgumentOutOfRangeException.Create('ResolveTimeout cannot be less than zero');
+end;
+
 procedure THttpRequest.SetResource(const value: string);
 begin
   FResource := value;
@@ -516,6 +582,14 @@ end;
 procedure THttpRequest.SetSaveAsFile(const value: string);
 begin
   FSaveAsFile := value;
+end;
+
+procedure THttpRequest.SetSendTimeout(const value: integer);
+begin
+  if value >= 0 then
+    FSendTimeout := value
+  else
+    raise EArgumentOutOfRangeException.Create('SendTimeout cannot be less than zero');
 end;
 
 procedure THttpRequest.SetUrlSegments(const value: TStrings);

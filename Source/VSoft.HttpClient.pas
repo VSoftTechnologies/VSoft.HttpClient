@@ -100,6 +100,17 @@ type
     function GetFollowRedirects : boolean;
     procedure SetFollowRedirects(const value : boolean);
 
+    function GetResolveTimeout : integer;
+    procedure SetResolveTimeout(const value : integer);
+
+    function GetConnectTimeout : integer;
+    procedure SetConnectTimeout(const value : integer);
+
+    function GetSendTimeout : integer;
+    procedure SetSendTimeout(const value : integer);
+
+    function GetReceiveTimeout : integer;
+    procedure SetReceiveTimeout(const value : integer);
 
     function GetBodyAsString : string;
     function GetCharSet : string;
@@ -149,6 +160,11 @@ type
     property ForceFormData : boolean read GetForceFormData write SetForceFormData;
     //when set, the response will be written directly to the file, saving a copy operation
     property SaveAsFile : string read GetSaveAsFile write SetSaveAsFile;
+
+    property ResolveTimeout : integer read GetResolveTimeout write SetResolveTimeout;
+    property ConnectTimeout : integer read GetConnectTimeout write SetConnectTimeout;
+    property SendTimeout    : integer read GetSendTimeout write SetSendTimeout;
+    property ReceiveTimeout : integer read GetReceiveTimeout write SetReceiveTimeout;
   end;
 
   IContentDisposition = interface
