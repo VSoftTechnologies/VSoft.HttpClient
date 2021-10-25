@@ -15,13 +15,13 @@ uses
   DUnitX.TestFramework,
   VSoftHttpClientTests in 'VSoftHttpClientTests.pas',
   VSoft.HttpClient in '..\Source\VSoft.HttpClient.pas',
-  VSoft.HttpClient.Request in '..\Source\VSoft.HttpClient.Request.pas',
   VSoft.HttpClient.Response in '..\Source\VSoft.HttpClient.Response.pas',
   VSoft.HttpClient.WinHttp in '..\Source\VSoft.HttpClient.WinHttp.pas',
   VSoft.HttpClient.WinHttpClient in '..\Source\VSoft.HttpClient.WinHttpClient.pas',
   VSoft.HttpClient.WinHttp.Api in '..\Source\VSoft.HttpClient.WinHttp.Api.pas',
   VSoft.HttpClient.MultipartFormData in '..\Source\VSoft.HttpClient.MultipartFormData.pas',
-  VSoft.HttpClient.Headers in '..\Source\VSoft.HttpClient.Headers.pas';
+  VSoft.HttpClient.Headers in '..\Source\VSoft.HttpClient.Headers.pas',
+  VSoft.HttpClient.Request in '..\Source\VSoft.HttpClient.Request.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

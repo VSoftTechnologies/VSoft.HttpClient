@@ -22,7 +22,8 @@ type
 
 implementation
 uses
-  WinApi.ActiveX;
+  WinApi.ActiveX,
+  VSoft.CancellationToken;
 
 procedure TMyTestObject.TestGet;
 var
@@ -30,10 +31,13 @@ var
   request : IHttpRequest;
   response : IHttpResponse;
   i : integer;
+  cancelTokenSource : ICancellationTokenSource;
 begin
   client := THttpClientFactory.CreateClient('https://localhost:5001/api/v1/index.json');
   request := THttpClientFactory.CreateRequest('');
   request.AddParameter('name', 'the value');
+
+    cancelTokenSource := TCancellationTokenSourceFactory.Create;
 
   response := client.Get(request);
 
@@ -64,6 +68,8 @@ begin
   request.AddParameter('two', 'value2');
   request.AddParameter('three', 'the value 3');
   request.ForceFormData := true;
+
+
 
   response := client.Post(request);
 
@@ -104,5 +110,5 @@ end;
 
 initialization
   TDUnitX.RegisterTestFixture(TMyTestObject);
-  CoInitialize(nil); //needed for winhttp.
+  CoInitializeEx(nil, COINIT_APARTMENTTHREADED); //needed for winhttp.
 end.

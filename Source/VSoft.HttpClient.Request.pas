@@ -267,7 +267,7 @@ end;
 
 function THttpRequest.GetAuthorization: string;
 begin
-  result := FHeaders.Values['sAuthorizationHeader'];
+  result := FHeaders.Values[sAuthorizationHeader];
 end;
 
 function THttpRequest.GetBody: IStream;
@@ -358,7 +358,7 @@ end;
 
 function THttpRequest.GetContentType: string;
 begin
-  result := FHeaders.Values['Content-Type'];
+  result := FHeaders.Values[cContentTypeHeader];
 end;
 
 function THttpRequest.GetFiles: TStrings;
