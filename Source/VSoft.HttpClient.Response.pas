@@ -1,9 +1,9 @@
-﻿{***************************************************************************}
+{***************************************************************************}
 {                                                                           }
 {           VSoft.HttpClient - A wrapper over WinHttp                       }
 {                              modelled on restSharp                        }
 {                                                                           }
-{           Copyright © 2020 Vincent Parrett and contributors               }
+{           Copyright � 2020 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -30,14 +30,15 @@ unit VSoft.HttpClient.Response;
 interface
 
 uses
-  WinApi.ActiveX,
   System.Classes,
   VSoft.HttpClient;
 
 type
   IHttpResponseInternal = interface(IHttpResponse)
   ['{CD23F38C-69E8-40F5-99B6-6308B57C2F34}']
-    procedure SetContent(const stream : IStream);
+    procedure SetContent(const stream : TStream);
+    procedure SetHeaders(const rawHeaders : string);
+    procedure SetStatusCode(const value : integer);
   end;
 
   THttpResponse = class(TInterfacedObject, IHttpResponse, IHttpResponseInternal)
@@ -49,6 +50,8 @@ type
     FErrorMessage : string;
     FContentDisposition : IContentDisposition;
   protected
+
+
     function GetContentType: string;
     function GetHeaders: TStrings;
     function GetHttpResponseCode: Integer;
@@ -58,11 +61,16 @@ type
     function GetFileName : string;
     function GetContentLength: Int64;
     function GetContentDisposition : IContentDisposition;
-    procedure SetContent(const stream: IStream);
     function GetErrorMessage: string;
     function HttpResultString : string;
     function IsSuccess : boolean;
     procedure SaveTo(const folderName :string; const fileName : string = '');
+
+    //internal
+    procedure SetHeaders(const rawHeaders : string);
+    procedure SetContent(const stream: TStream);
+    procedure SetStatusCode(const value : integer);
+
   public
     constructor Create(const httpResult : integer; const errorMsg : string; const headers : string; const fileName : string);
     destructor Destroy;override;
@@ -277,24 +285,22 @@ begin
   end;
 end;
 
-procedure THttpResponse.SetContent(const stream: IStream);
-var
-  adapter : IStream;
-  {$IF CompilerVersion >= 29.0}
-  bytesRead, bytesWritten : UInt64;
-  {$ELSE}
-  bytesRead, bytesWritten : Int64;
-  {$IFEND}
+procedure THttpResponse.SetContent(const stream: TStream);
 begin
   if stream = nil then
     exit;
-  adapter := TStreamAdapter.Create(FStream) as IStream;
-  {$IF CompilerVersion >= 29.0}
-  stream.CopyTo(adapter, High(UInt64), bytesRead, bytesWritten);
-  {$ELSE}
-  stream.CopyTo(adapter, High(Int64), bytesRead, bytesWritten);
-  {$IFEND}
+  FStream.CopyFrom(stream, stream.Size);
   FStream.Position := 0;
+end;
+
+procedure THttpResponse.SetHeaders(const rawHeaders: string);
+begin
+
+end;
+
+procedure THttpResponse.SetStatusCode(const value: integer);
+begin
+  FHttpResult := value;
 end;
 
 end.

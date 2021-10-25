@@ -1,9 +1,9 @@
-﻿{***************************************************************************}
+{***************************************************************************}
 {                                                                           }
 {           VSoft.HttpClient - A wrapper over WinHttp                       }
 {                              modelled on restSharp                        }
 {                                                                           }
-{           Copyright © 2020 Vincent Parrett and contributors               }
+{           Copyright � 2020 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
@@ -35,7 +35,7 @@ uses
   WinApi.ActiveX,
   System.Classes;
 
-//Note (VP): this is very simplistic, I did enough to make it work where I was usign it. For more complex needs, use Indy.
+//Note (VP): this is very simplistic, I did enough to make it work where I was using it. For more complex needs, use Indy.
 
 type
   IMultipartFormDataGenerator = interface
@@ -48,7 +48,7 @@ type
     procedure AddStream(const fieldName: string; stream: TStream; const fileName: string = ''; const contentType: string = '');
 
     //wraps the stream in an adapter and sets the boundary to a new value, so get the boundary/contenttype first!
-    function Generate : IStream;
+    function Generate : TStream;
 
     property Boundary : string read GetBoundary;
     property ContentType : string read GetContentType;
@@ -83,7 +83,7 @@ type
     procedure GenerateUniqueBoundry;
     function GetBoundary: string;
     function GetContentType: string;
-    function Generate: IStream;
+    function Generate: TStream;
 
     procedure WriteString(const value : string);
 
@@ -886,14 +886,14 @@ begin
   inherited;
 end;
 
-function TMultipartFormData.Generate: IStream;
+function TMultipartFormData.Generate: TStream;
 begin
   //add the final boundary
   WriteString('--' + FBoundary + '--');
   FDataStream.Seek(0,soFromBeginning); //this is required as the http request doesn't rewind the stream
 
-  result := TStreamAdapter.Create(FDataStream, soOwned);
-  FDataStream := nil;
+  result := FDataStream;
+//  FDataStream := nil;
   GenerateUniqueBoundry;
 end;
 

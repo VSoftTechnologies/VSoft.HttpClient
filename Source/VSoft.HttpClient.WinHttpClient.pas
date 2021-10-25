@@ -1,575 +1,582 @@
-﻿{***************************************************************************}
-{                                                                           }
-{           VSoft.HttpClient - A wrapper over WinHttp                       }
-{                              modelled on restSharp                        }
-{                                                                           }
-{           Copyright © 2020 Vincent Parrett and contributors               }
-{                                                                           }
-{           vincent@finalbuilder.com                                        }
-{           https://www.finalbuilder.com                                    }
-{                                                                           }
-{                                                                           }
-{***************************************************************************}
-{                                                                           }
-{  Licensed under the Apache License, Version 2.0 (the "License");          }
-{  you may not use this file except in compliance with the License.         }
-{  You may obtain a copy of the License at                                  }
-{                                                                           }
-{      http://www.apache.org/licenses/LICENSE-2.0                           }
-{                                                                           }
-{  Unless required by applicable law or agreed to in writing, software      }
-{  distributed under the License is distributed on an "AS IS" BASIS,        }
-{  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
-{  See the License for the specific language governing permissions and      }
-{  limitations under the License.                                           }
-{                                                                           }
-{***************************************************************************}
-
-//We are using the com api at he moment, which has some limitations
-//When time permits we'll re-implement this using the C api.
-
-unit VSoft.HttpClient.WinHttpClient;
+﻿unit VSoft.HttpClient.WinHttpClient;
 
 interface
 
 uses
-  Winapi.ActiveX,
-  VSoft.CancellationToken,
+  System.TypInfo,
+  System.SysUtils,
+  System.Generics.Collections,
   System.SyncObjs,
-  VSoft.HttpClient.WinHttp,
-  VSoft.HttpClient;
+  System.Classes,
+  WinApi.Windows,
+  VSoft.CancellationToken,
+  VSoft.HttpClient,
+  VSoft.WinHttp.Api,
+  VSoft.HttpClient.Response;
 
 
 type
-  TWinHttpOnError = procedure(ErrorNumber: Integer; const ErrorDescription: WideString) of object;
-  TWinHttpOnResponseDataAvailable = procedure(var Data: PSafeArray) of object;
-  TWinHttpOnResponseFinished = procedure of object;
-  TWinHttpOnResponseStart = procedure (Status: Integer; const ContentType: WideString) of object;
-
-  //https://docs.microsoft.com/en-us/windows/win32/winhttp/iwinhttprequestevents-interface
-  //only really need the events if we are going to support async.
-  //note we are using a separate object to avoid circular references
-  TWinHttpEvents = class(TInterfacedObject, IWinHttpRequestEvents)
+  THttpClient = class(TInterfacedObject, IHttpClient, IHttpClientInternal)
   private
-    FOnError : TWinHttpOnError;
-    FOnResponseDataAvailable : TWinHttpOnResponseDataAvailable;
-    FOnResponseFinished :TWinHttpOnResponseFinished;
-    FOnResponseStart : TWinHttpOnResponseStart;
-  protected
-    procedure OnError(ErrorNumber: Integer; const ErrorDescription: WideString); stdcall;
-    procedure OnResponseDataAvailable(var Data: PSafeArray); stdcall;
-    procedure OnResponseFinished; stdcall;
-    procedure OnResponseStart(Status: Integer; const ContentType: WideString); stdcall;
-  public
-    constructor Create(const onError : TWinHttpOnError; const onResponseDataAvailable : TWinHttpOnResponseDataAvailable;
-                       const onResponseFinished :TWinHttpOnResponseFinished; const onResponseStart : TWinHttpOnResponseStart);
-  end;
-
-  THttpClientWinHttp = class(TInterfacedObject, IHttpClient)
-  private
-    FWinHttpRequest: IWinHttpRequest;
-    FWinHttpEvents : IWinHttpRequestEvents;
-    FEventsId : integer;
-    FWinHttpThreadId : Cardinal;
-
-    FAuthType : THttpAuthType;
-    FApiKeyHeaderName : string;
+    FSession : HINTERNET;
+    //FConnection : HINTERNET;
     FBaseUri : string;
-    FPassword : string;
+    FUserAgent : string;
+    FRequests : TList<TRequest>;
+    FAuthTyp : THttpAuthType;
     FUserName : string;
-    FOnProgress : THttpProgressEvent;
-
-    //async support
+    FPassword : string;
     FWaitEvent : TEvent;
-    FError : string;
-    FErrorCode : integer;
-
+    FCurrentRequest : TRequest;
+    FResponse : IHttpResponseInternal;
+    FReceiveBuffer : TBytes;
+    FLastReceiveBlockSize : DWORD;
+    FBytesWritten : DWORD;
   protected
-    procedure ConnectEvents;
-    procedure DisconnectEvents;
-    procedure CreateWinHttpRequest;
-    procedure DoOnError(ErrorNumber: Integer; const ErrorDescription: WideString);
-    procedure DoOnResponseDataAvailable(var Data: PSafeArray);
-    procedure DoOnResponseFinished;
-    procedure DoOnResponseStart(Status: Integer; const ContentType: WideString);
+    procedure HTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
+
+    function ReadHeaders(hRequest : HINTERNET) : boolean;
+    function ReadData(hRequest : HINTERNET; dataSize : DWORD) : boolean;
+
+    function WriteData(hRequest : HINTERNET; position : DWORD) : boolean;
 
 
-    function GetApiKeyHeaderName: string;
-    function GetAuthType: THttpAuthType;
-    function GetBaseUri: string;
-    function GetOnProgress: THttpProgressEvent;
-    function GetPassword: string;
-    function GetUserName: string;
+    function WriteHeaders(hRequest : HINTERNET; const headers : TStrings) : boolean;
 
-    //actual calls
-    function DoGet(const request : IHttpRequest; const cancellationToken : ICancellationToken) : IHttpResponse;
-    function DoPost(const request : IHttpRequest; const cancellationToken : ICancellationToken) : IHttpResponse;
-    function DoPut(const request : IHttpRequest; const cancellationToken : ICancellationToken) : IHttpResponse;
-    function DoDelete(const request : IHttpRequest; const cancellationToken : ICancellationToken) : IHttpResponse;
-
-    function UrlFromRequest(const request : IHttpRequest) : string;
-
-    //sanity check
-    function Send(const request : IHttpRequest; const cancellationToken : ICancellationToken) : IHttpResponse;
-
-    //interface
-    function Post(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
-    function Get(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
-    function Put(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
-    function Delete(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
+    function ConfigureWinHttpRequest(hRequest : HINTERNET; const request : TRequest) : boolean;
 
 
-    procedure SetApiKeyHeaderName(const value: string);
-    procedure SetAuthType(const value: THttpAuthType);
-    procedure SetBaseUri(const value: string);
-    procedure SetOnProgress(const value: THttpProgressEvent);
-    procedure SetPassword(const value: string);
-    procedure SetUserName(const value: string);
+    procedure EnsureSession;
+
+    function GetBaseUri : string;
+    procedure SetBaseUri(const value : string);
+    function GetUserAgent : string;
+    procedure SetUserAgent(const value : string);
+
+    procedure SetAuthType(const value : THttpAuthType);
+    function GetAuthType : THttpAuthType;
+    function GetUserName : string;
+    function GetPassword : string;
+    procedure SetUserName(const value : string);
+    procedure SetPassword(const value : string);
+
+    function CreateRequest(const resource : string) : TRequest;
+
+    //IHttpClientInternal
+    function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
+    procedure ReleaseRequest(const request : TRequest);
+
+
   public
     constructor Create(const baseUri : string);
     destructor Destroy;override;
   end;
 
+
 implementation
 
 uses
-  System.StrUtils,
-  System.VarUtils,
-  WinApi.Windows,
-  System.Classes,
-  System.SysUtils,
-  VSoft.HttpClient.Response;
+  System.Math,
+  System.StrUtils;
 
-const
-  HTTP_METHOD : array[THttpMethod] of string = ('GET', 'POST', 'PUT', 'DELETE');
+const cReceiveBufferSize : DWORD = 8 * 1024;
+
+type
+  TRequestCracker = class(TRequest);
 
 
-{ THttpClientWinInet }
-
-function THttpClientWinHttp.Get(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
-begin
-  request.HttpMethod := THttpMethod.GET;
-  result := Send(request, cancellationToken);
-end;
-
-function THttpClientWinHttp.Post(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
-begin
-  request.HttpMethod := THttpMethod.POST;
-  result := Send(request, cancellationToken);
-end;
-
-function THttpClientWinHttp.Put(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
-begin
-  request.HttpMethod := THttpMethod.PUT;
-  result := Send(request, cancellationToken);
-end;
-
-function THttpClientWinHttp.Send(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
+procedure _HTTPCallback(hInternet: HINTERNET; dwContext: Pointer; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD); stdcall;
 var
-  sUrl : string;
-  i: Integer;
-  async : boolean;
+  client : THttpClient;
 begin
-  CreateWinHttpRequest;
-  FWinHttpRequest.Option[WinHttpRequestOption_EnableRedirects] := request.FollowRedirects;
-  FWinHttpRequest.SetTimeouts(request.ResolveTimeout, request.ConnectTimeout, request.SendTimeout, request.ReceiveTimeout);
-  result := nil;
-  sUrl := UrlFromRequest(request);
+  client := THttpClient(dwContext);
+  if client <> nil then
+    client.HTTPCallback(hInternet, dwInternetStatus, lpvStatusInformation, dwStatusInformationLength);
 
-  //TODO : validate uri;
-  if sUrl = '' then
-    raise Exception.Create('Empty Uri');
-
-  //if a cancellation token is passed in, we will use async mode.
-  async := cancellationToken <> nil;
-  FWinHttpRequest.Open(HTTP_METHOD[request.HttpMethod],sUrl, async );
-
-  //apply headers
-  for i := 0 to request.Headers.Count -1 do
-  begin
-    //TODO : check when valuefromindex was added > XE2?
-    if (request.Headers.Names[i] = 'Content-Type') and (request.GetCharSet <> '') then
-      FWinHttpRequest.SetRequestHeader('Content-Type', request.ContentType + '; charset=' + request.GetCharSet )
-    else
-      FWinHttpRequest.SetRequestHeader(request.Headers.Names[i], request.Headers.ValueFromIndex[i] );
-  end;
-
-  //if we set the header on the request then use that!
-  if request.Authorization = '' then
-  begin
-    case FAuthType of
-      THttpAuthType.None: ;
-      THttpAuthType.Basic:
-      begin
-        //TODO : Add basic auth header
-
-      end;
-      THttpAuthType.ApiKey:
-      begin
-        if (FApiKeyHeaderName <> '') and (FPassword <> '')  then
-          FWinHttpRequest.SetRequestHeader(FApiKeyHeaderName, FPassword );
-      end;
-      THttpAuthType.GitHubToken:
-      begin
-        FWinHttpRequest.SetRequestHeader('Authorization', 'Bearer ' + FPassword);
-      end;
-    end;
-  end;
-  FError := '' ;
-  FErrorCode := 0;
-  case request.HttpMethod of
-    THttpMethod.GET    : result := DoGet(request, cancellationToken);
-    THttpMethod.POST   : result := DoPost(request, cancellationToken);
-    THttpMethod.PUT    : result := DoPut(request, cancellationToken);
-    THttpMethod.DELETE : result := DoDelete(request, cancellationToken);
-  else
-     raise Exception.Create('Not implemented!');
-  end;
 end;
 
-procedure THttpClientWinHttp.ConnectEvents;
-var
-   connPointContainer : IConnectionPointContainer;
-   connPoint: IConnectionPoint;
+function THttpClient.CreateRequest(const resource: string): TRequest;
 begin
-  if (FWinHttpRequest = nil) or (FEventsId <> -1) then
+  result := TRequest.Create(Self, resource);
+  FRequests.Add(result); //track requests to ensure they get freed.
+end;
+
+
+{ THttpClient }
+
+function THttpClient.ConfigureWinHttpRequest(hRequest: HINTERNET; const request: TRequest): boolean;
+var
+  option : DWORD;
+begin
+  result := WriteHeaders(hRequest, request.Headers);
+  if not result then
     exit;
-  if Supports(FWinHttpRequest, IConnectionPointContainer, connPointContainer) then
+
+  //it's a rest client, we don't want to send cookies
+  option := WINHTTP_DISABLE_COOKIES;
+  result := WinHttpSetOption(hRequest, WINHTTP_OPTION_DISABLE_FEATURE, @option, sizeof(option));
+  if not result then
+    exit;
+  if not request.FollowRedirects then
   begin
-    if connPointContainer.FindConnectionPoint(IID_IWinHttpRequestEvents, connPoint) = S_OK then
-      connPoint.Advise(FWinHttpEvents, FEventsId);
+    option := WINHTTP_DISABLE_REDIRECTS;
+    result := WinHttpSetOption(hRequest, WINHTTP_OPTION_DISABLE_FEATURE, @option, sizeof(option));
+    if not result then
+      exit;
   end;
+
+
 
 end;
 
-constructor THttpClientWinHttp.Create(const baseUri: string);
+constructor THttpClient.Create(const baseUri : string);
 begin
+  FRequests := TList<TRequest>.Create;
   FBaseUri := baseUri;
-  FWinHttpRequest := nil;
-  FWinHttpEvents := TWinHttpEvents.Create(DoOnError, DoOnResponseDataAvailable, DoOnResponseFinished, DoOnResponseStart);
-  FEventsId := -1;
+  FUserAgent := 'VSoft.HttpClient';
   FWaitEvent := TEvent.Create(nil,false, false,'');
 end;
 
-function THttpClientWinHttp.Delete(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
-begin
-  request.HttpMethod := THttpMethod.DELETE;
-  result := Send(request, cancellationToken);
-end;
 
-destructor THttpClientWinHttp.Destroy;
+destructor THttpClient.Destroy;
+var
+  request: TRequest;
 begin
   FWaitEvent.SetEvent;
   FWaitEvent.Free;
-  if FWinHttpRequest <> nil then
-    DisconnectEvents;
-  FWinHttpRequest := nil;
+
+  if FSession <> nil then
+    WinHttpCloseHandle(FSession);
+  for request in FRequests do
+  begin
+    request.Free;
+  end;
+  FRequests.Free;
   inherited;
 end;
 
-
-procedure THttpClientWinHttp.DisconnectEvents;
-var
-   connPointContainer : IConnectionPointContainer;
-   connPoint: IConnectionPoint;
+procedure THttpClient.EnsureSession;
 begin
-  if (FWinHttpRequest = nil) or (FEventsId = -1) then
-    exit;
-  if Supports(FWinHttpRequest, IConnectionPointContainer, connPointContainer) then
-  begin
-    if connPointContainer.FindConnectionPoint(IID_IWinHttpRequestEvents, connPoint) = S_OK then
-    begin
-      connPoint.Unadvise(FEventsId);
-      FEventsId := -1;
-    end;
-  end;
-end;
-
-function THttpClientWinHttp.DoDelete(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
-begin
-  raise ENotImplemented.Create('Delete method not implemented');
-end;
-
-function THttpClientWinHttp.DoGet(const request : IHttpRequest; const cancellationToken : ICancellationToken): IHttpResponse;
-var
-  httpResult : integer;
-  responseStream  : IStream;
-  response : IHttpResponseInternal;
-  waitHandles : array[0..1] of THandle;
-  waitRes : integer;
-  sHeaders : string;
-begin
-  result := nil;
-
-  result := nil;
-  FWinHttpRequest.Send(''); //no body.
-
-  //if we have a cancellationToken then we are using async mode.
-  if cancellationToken <> nil then
-  begin
-    waitHandles[0] := FWaitEvent.Handle;
-    waitHandles[1] := cancellationToken.Handle;
-    waitRes := WaitForMultipleObjects(2,@waitHandles[0],false, INFINITE); //todo - add timeouts!
-    if waitRes <> WAIT_OBJECT_0 then
-    begin
-      //it wasn't the event being set, so it must have been the cancellation token.
-      FWinHttpRequest.Abort;
-      DisconnectEvents;
-      exit;
-    end;
-    if FErrorCode = 0 then
-      httpResult := FWinHttpRequest.Status
-    else
-      httpResult := FErrorCode;
-  end
-  else
-  begin
-    httpResult := FWinHttpRequest.Status;
-    FError := FWinHttpRequest.StatusText;
-  end;
-
-  if httpResult > 0 then
-    sHeaders := FWinHttpRequest.GetAllResponseHeaders;
-
-  response := THttpResponse.Create(httpResult, FError,  sHeaders, request.SaveAsFile );
-  result := response;
-
-  try
-    if httpResult > 0 then
-    begin
-      responseStream := IUnknown(FWinHttpRequest.ResponseStream) as IStream;
-      response.SetContent(responseStream);
-    end
-    else
-      response.SetContent(nil);
-
-  except
-    //ignore any error here.. not actually seen an error
-  end;
-end;
-
-function THttpClientWinHttp.DoPost(const request : IHttpRequest; const cancellationToken : ICancellationToken): IHttpResponse;
-var
-  httpResult : integer;
-  responseStream  : IStream;
-  response : IHttpResponseInternal;
-  waitHandles : array[0..1] of THandle;
-  waitRes : integer;
-  body : IStream;
-  sHeaders : string;
-begin
-  result := nil;
-  body := request.GetBody;
-  //formdata can change the contentType
-  if request.ContentType <> '' then
-  begin
-    if request.GetCharSet <> '' then
-      FWinHttpRequest.SetRequestHeader('Content-Type', request.ContentType + '; charset=' + request.GetCharSet)
-    else
-      FWinHttpRequest.SetRequestHeader('Content-Type', request.ContentType);
-  end;
-
-  FWinHttpRequest.Send(body);
-
-  //if we have a cancellationToken then we are using async mode.
-  if cancellationToken <> nil then
-  begin
-    waitHandles[0] := FWaitEvent.Handle;
-    waitHandles[1] := cancellationToken.Handle;
-    waitRes := WaitForMultipleObjects(2,@waitHandles[0],false, INFINITE); //todo - add timeouts!
-    if waitRes <> WAIT_OBJECT_0 then
-    begin
-      //it wasn't the event being set, so it must have been the cancellation token.
-      FWinHttpRequest.Abort;
-      DisconnectEvents;
-      exit;
-    end;
-    if FErrorCode = 0 then
-      httpResult := FWinHttpRequest.Status
-    else
-      httpResult := FErrorCode;
-  end
-  else
-  begin
-    httpResult := FWinHttpRequest.Status;
-    FError := FWinHttpRequest.StatusText;
-  end;
-
-  if httpResult > 0 then
-    sHeaders := FWinHttpRequest.GetAllResponseHeaders;
-
-  response := THttpResponse.Create(httpResult, FError,  sHeaders, request.SaveAsFile);
-  result := response;
-
-  try
-    if httpResult > 0 then
-    begin
-      responseStream := IUnknown(FWinHttpRequest.ResponseStream) as IStream;
-      response.SetContent(responseStream);
-    end;
-  except
-    //ignore any error here.. not actually seen an error
-  end;
+  FSession := WinHttpOpen(PWideChar(FUserAgent), WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC);
+  if FSession = nil then
+    RaiseLastOSError;
 end;
 
 
-function THttpClientWinHttp.DoPut(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
+function THttpClient.GetAuthType: THttpAuthType;
 begin
-  result := DoPost(request,cancellationToken);
+  result := FAuthTyp;
 end;
 
-procedure THttpClientWinHttp.DoOnError(ErrorNumber: Integer; const ErrorDescription: WideString);
-begin
-  FErrorCode := ErrorNumber;
-  FError := ErrorDescription;
-  FWaitEvent.SetEvent;
-end;
-
-procedure THttpClientWinHttp.DoOnResponseDataAvailable(var Data: PSafeArray);
-begin
-
-end;
-
-procedure THttpClientWinHttp.DoOnResponseFinished;
-begin
-  FWaitEvent.SetEvent;
-end;
-
-procedure THttpClientWinHttp.DoOnResponseStart(Status: Integer; const ContentType: WideString);
-begin
-
-end;
-procedure THttpClientWinHttp.CreateWinHttpRequest;
-begin
-  //winhttp is a com object and cannot be shared accross threads.
-  if (FWinHttpRequest = nil) or (FWinHttpThreadId <> TThread.CurrentThread.ThreadID)  then
-  begin
-    if FWinHttpRequest <> nil then
-      DisconnectEvents;
-    FWinHttpRequest := CoWinHttpRequest.Create;
-    FWinHttpThreadId := TThread.CurrentThread.ThreadID;
-    ConnectEvents;
-  end;
-end;
-
-function THttpClientWinHttp.GetApiKeyHeaderName: string;
-begin
-  result := FApiKeyHeaderName;
-end;
-
-function THttpClientWinHttp.GetAuthType: THttpAuthType;
-begin
-  result := FAuthType;
-end;
-
-function THttpClientWinHttp.GetBaseUri: string;
+function THttpClient.GetBaseUri: string;
 begin
   result := FBaseUri;
 end;
 
-function THttpClientWinHttp.GetOnProgress: THttpProgressEvent;
-begin
-  result := FOnProgress;
-end;
 
-function THttpClientWinHttp.GetPassword: string;
+function THttpClient.GetPassword: string;
 begin
   result := FPassword;
 end;
 
-function THttpClientWinHttp.GetUserName: string;
+function THttpClient.GetUserAgent: string;
+begin
+  result := FUserAgent;
+end;
+
+function THttpClient.GetUserName: string;
 begin
   result := FUserName;
 end;
 
-procedure THttpClientWinHttp.SetApiKeyHeaderName(const value: string);
+procedure THttpClient.HTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
+var
+  dataSize : DWORD;
 begin
-  FApiKeyHeaderName := value;
+  case dwInternetStatus of
+
+    WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE :
+    begin
+      ReadHeaders(hInternet);
+      //this will cause a data available callback
+      if not WinHttpQueryDataAvailable(hInternet, nil) then
+      begin
+        //cleanup.
+        FWaitEvent.SetEvent; //unblock
+      end
+    end;
+
+    WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE :
+    begin
+      dataSize := PDWORD(lpvStatusInformation)^;
+      if dataSize = 0 then //all data read
+      begin
+        //cleanup
+        FWaitEvent.SetEvent; //unblock
+      end
+      else
+      begin
+        if not ReadData(hInternet, dataSize) then
+        begin
+          //cleanup
+          FWaitEvent.SetEvent; //unblock
+        end;
+      end;
+    end;
+
+    WINHTTP_CALLBACK_STATUS_READ_COMPLETE :
+    begin
+      //if we didn't receive any more data then we are done.
+      if FLastReceiveBlockSize = 0 then
+      begin
+
+        FWaitEvent.SetEvent;
+        exit;
+      end
+      else
+      begin
+        //TODO : Copy to response.
+
+      end;
+
+      //this will cause a data available callback
+      if not WinHttpQueryDataAvailable(hInternet, nil) then
+      begin
+        //cleanup.
+        FWaitEvent.SetEvent; //unblock
+      end
+    end;
+
+    WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE :
+    begin
+      //write data here?
+      if FBytesWritten < FCurrentRequest.ContentLength then
+        if FCurrentRequest.HtttpMethod <> THttpMethod.GET then
+        begin
+          if not WriteData(hInternet, 0) then
+          begin
+
+            FWaitEvent.SetEvent;
+          end;
+        end;
+
+      if (WinHttpReceiveResponse( hInternet, nil) = false) then
+      begin
+        //handle error?
+        //cleanup.
+        FWaitEvent.SetEvent; //unblock
+      end;
+    end;
+
+    WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE :
+    begin
+      dataSize := PDWORD(lpvStatusInformation)^;
+      if dataSize = 0 then
+        exit;
+      Inc(FBytesWritten, dataSize);
+      if FBytesWritten < FCurrentRequest.ContentLength then
+      begin
+        if not WriteData(hInternet, FBytesWritten) then
+        begin
+           FWaitEvent.SetEvent; //unblock
+           exit;
+        end;
+      end;
+
+      if (WinHttpReceiveResponse( hInternet, nil) = false) then
+      begin
+        //handle error?
+        //cleanup.
+        FWaitEvent.SetEvent; //unblock
+      end;
+
+      //done
+//      FWaitEvent.SetEvent; //unblock
+
+
+
+    end;
+
+    WINHTTP_CALLBACK_STATUS_RESPONSE_RECEIVED :
+    begin
+      FWaitEvent.SetEvent; //unblock
+    end;
+
+  end;
+
+
+
+
 end;
 
-procedure THttpClientWinHttp.SetAuthType(const value: THttpAuthType);
+function THttpClient.ReadData(hRequest: HINTERNET; dataSize : DWORD): boolean;
 begin
-  FAuthType := value;
+  result := WinHttpReadData(hRequest, FReceiveBuffer[0], cReceiveBufferSize -1 , @FLastReceiveBlockSize);
 end;
 
-procedure THttpClientWinHttp.SetBaseUri(const value: string);
+function THttpClient.ReadHeaders(hRequest: HINTERNET) : boolean;
+var
+  bufferSize : DWORD;
+  headers : string;
+  statusCode : DWORD;
+  statusCodeSize : DWORD;
+
 begin
-  //TODO : use VSoft.Uri to validate uri.
+  result := false;
+  statusCodeSize := Sizeof(DWORD);
+
+  if WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE + WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,　@statusCode, statusCodeSize, WINHTTP_NO_HEADER_INDEX) then
+    FResponse.SetStatusCode(statusCode);
+
+  if (not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, nil, bufferSize, WINHTTP_NO_HEADER_INDEX)) then
+  begin
+    if GetLastError <> ERROR_INSUFFICIENT_BUFFER then
+    begin
+      //how do we handle the error
+      exit;
+    end;
+  end;
+
+  SetLength(headers, bufferSize div SizeOf(Char) - 1);
+
+  if(WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, PChar(headers), bufferSize, WINHTTP_NO_HEADER_INDEX)) then
+  begin
+    FResponse.SetHeaders(headers);
+    result := true;
+  end;
+
+
+end;
+
+procedure THttpClient.ReleaseRequest(const request: TRequest);
+begin
+  FRequests.Remove(request);
+end;
+
+
+const http_version = 'HTTP/2';
+
+const WAIT_OBJECT_1 = WAIT_OBJECT_0 + 1;
+
+function HttpMethodToString(const value : THttpMethod) : string;
+begin
+  result := GetEnumName(TypeInfo(THttpMethod), Ord(value));
+end;
+
+
+//simple get/post etc.
+function THttpClient.Send(const request: TRequest; const cancellationToken: ICancellationToken): IHttpResponse;
+var
+  urlComp : TURLComponents;
+  host : string;
+  bResult : boolean;
+  hConnection : HINTERNET;
+  hRequest : HINTERNET;
+  dwOpenRequestFlags : DWORD;
+  pCallBack : TWinHttpStatusCallback;
+  waitHandles : array[0..1] of THandle;
+  waitRes : integer;
+  handleCount : integer;
+  option : DWORD;
+  method : string;
+  dataLength : DWORD;
+
+  data : Pointer;
+
+  stream : TStream;
+  buffer : TBytes;
+  bufferSize : DWORD;
+
+begin
+  if FCurrentRequest <> nil then
+    raise Exception.Create('A request is in progress.. winhttp is not reentrant!');
+  try
+    result := nil;
+    FCurrentRequest := request;
+    EnsureSession;
+    SetLength(FReceiveBuffer, cReceiveBufferSize);
+
+
+    ZeroMemory(@urlComp, SizeOf(urlComp));
+    urlComp.dwStructSize := SizeOf(urlComp);
+
+    urlComp.dwSchemeLength    := DWORD(-1);
+    urlComp.dwHostNameLength  := DWORD(-1);
+    urlComp.dwUrlPathLength   := DWORD(-1);
+    urlComp.dwExtraInfoLength := DWORD(-1);
+
+    if not WinHttpCrackUrl(PWideChar(FBaseUri), 0, 0, urlComp ) then
+        RaiseLastOSError;
+
+    SetString(host, urlComp.lpszHostName, urlComp.dwHostNameLength);
+
+    hConnection := WinHttpConnect(FSession, PWideChar(host), urlComp.nPort, 0);
+    if hConnection = nil then
+        RaiseLastOSError;
+
+    option := WINHTTP_PROTOCOL_FLAG_HTTP2;
+
+    if not WinHttpSetOption(hConnection,WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, @option, SizeOf(DWORD)) then
+        RaiseLastOSError;
+
+    dwOpenRequestFlags := WINHTTP_FLAG_REFRESH;
+    if urlComp.nScheme = INTERNET_SCHEME_HTTPS then
+      dwOpenRequestFlags := dwOpenRequestFlags + WINHTTP_FLAG_SECURE;
+
+    method := HttpMethodToString(request.HtttpMethod);
+
+    hRequest := WinHttpOpenRequest(hConnection, PWideChar(method), PWideChar(request.Resource), PWideChar(http_version),WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES , dwOpenRequestFlags);
+    if hRequest = nil then
+        RaiseLastOSError;
+    try
+
+      pCallback := WinHttpSetStatusCallback(hRequest, _HTTPCallback, WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS + WINHTTP_CALLBACK_FLAG_REDIRECT, 0);
+
+      if Assigned(pCallBack) then
+        raise Exception.Create('Callback was already set!');
+
+      if not ConfigureWinHttpRequest(hRequest, request) then
+        raise Exception.Create('Could not configure request : ' + SysErrorMessage(GetLastError) );
+
+      handleCount := 1;
+      waitHandles[0] := FWaitEvent.Handle;
+      if cancellationToken <> nil then
+      begin
+         waitHandles[1] := cancellationToken.Handle;
+         Inc(handleCount);
+      end;
+
+      dataLength := request.ContentLength;
+
+      if (request.HtttpMethod <> THttpMethod.GET) and (dataLength > 0) then
+      begin
+        stream := TRequestCracker(FCurrentRequest).GetBody;
+        bufferSize := TRequestCracker(FCurrentRequest).GetContentLength;
+        SetLength(buffer,bufferSize);
+        ZeroMemory(@buffer[0], bufferSize);
+        stream.ReadBuffer(buffer,0 , bufferSize);
+        data := @buffer[0];
+        dataLength := dataLength;
+        FBytesWritten := dataLength;
+      end
+      else
+      begin
+        data := WINHTTP_NO_REQUEST_DATA;
+        dataLength := 0;
+      end;
+
+      bResult := WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0, data, dataLength, dataLength, NativeUInt(Pointer(Self)) );
+
+      if not bResult then
+        exit;
+
+      FResponse := THttpResponse.Create(0,'','',''); //for now
+
+      waitRes := WaitForMultipleObjects(handleCount ,@waitHandles[0],false, INFINITE); //todo - add timeouts!
+      case waitRes of
+        WAIT_OBJECT_0 :
+        begin
+          //wait object triggered - need to check if an error occured
+          //if all is ok, then return the response.
+          result := FResponse;
+          FResponse := nil;
+        end;
+        WAIT_OBJECT_1 :
+        begin
+          //cancellation token triggered
+          FResponse := nil;
+          exit;
+        end;
+        WAIT_TIMEOUT :
+        begin
+          //timed out, clean up and return.
+          FResponse := nil;
+          exit;
+        end;
+      end;
+    finally
+      WinHttpCloseHandle(hRequest);
+      WinHttpCloseHandle(hConnection);
+    end;
+  finally
+    FCurrentRequest := nil;
+    SetLength(FReceiveBuffer, 0);
+  end;
+end;
+
+
+procedure THttpClient.SetAuthType(const value: THttpAuthType);
+begin
+  FAuthTyp := value;
+end;
+
+procedure THttpClient.SetBaseUri(const value: string);
+begin
   FBaseUri := value;
 end;
 
-procedure THttpClientWinHttp.SetOnProgress(const value: THttpProgressEvent);
-begin
-  FOnProgress := value;
-end;
-
-procedure THttpClientWinHttp.SetPassword(const value: string);
+procedure THttpClient.SetPassword(const value: string);
 begin
   FPassword := value;
 end;
 
-procedure THttpClientWinHttp.SetUserName(const value: string);
+procedure THttpClient.SetUserAgent(const value: string);
+begin
+  FUserAgent := value;
+end;
+
+procedure THttpClient.SetUserName(const value: string);
 begin
   FUserName := value;
 end;
 
-function THttpClientWinHttp.UrlFromRequest(const request: IHttpRequest): string;
+
+function THttpClient.WriteData(hRequest: HINTERNET; position : DWORD): boolean;
 var
-  i : integer;
-  queryString : string;
+  stream : TStream;
+  buffer : TBytes;
+  size : Int64;
+  bufferSize : DWORD;
 begin
-  result := FBaseUri;
+  stream := TRequestCracker(FCurrentRequest).GetBody;
+  size := TRequestCracker(FCurrentRequest).GetContentLength;
 
-  if (request.Resource <> '') and (request.Resource <> '/') then
+  size := size - position;
+
+  bufferSize := Min(1024*1024, size);
+
+  SetLength(buffer,bufferSize + 2);
+  ZeroMemory(@buffer[0], bufferSize);
+  stream.ReadBuffer(buffer, position, bufferSize);
+
+  result := WinHttpWriteData(hRequest, buffer, bufferSize, nil);
+
+
+end;
+
+function THttpClient.WriteHeaders(hRequest: HINTERNET; const headers: TStrings): boolean;
+var
+  sHeaders : string;
+  i: Integer;
+  sCharSet : string;
+begin
+  if headers.Count = 0 then
+    exit(true);
+
+  sCharSet := TRequestCracker(FCurrentRequest).GetCharSet;
+
+  for i := 0 to headers.Count -1 do
   begin
-    if not EndsText('/', result) then
-      result := result + '/';
-    result := result + request.Resource;
+    if (headers.Names[i] = cContentTypeHeader) and (sCharSet <> '') then
+      sHeaders := sHeaders + cContentTypeHeader + ': ' +headers.ValueFromIndex[i] + '; charset=' + sCharSet
+    else
+      sHeaders := sHeaders + headers.Names[i] + ': ' +headers.ValueFromIndex[i];
+
+    if i < headers.count -1 then
+      sHeaders := sHeaders + #13#10;
   end;
 
-  if request.UrlSegments.Count > 0 then
-  begin
-    for i := 0 to request.UrlSegments.Count -1 do
-      result := StringReplace(result, '{' + request.UrlSegments.Names[i] + '}', request.UrlSegments.ValueFromIndex[i], [rfReplaceAll,rfIgnoreCase]);
-  end;
-
-  queryString := request.QueryString;
-  if queryString <> '' then
-    result := result + '?' + queryString;
-end;
-
-{ TWinHttpEvents }
-
-constructor TWinHttpEvents.Create(const onError: TWinHttpOnError; const onResponseDataAvailable: TWinHttpOnResponseDataAvailable; const onResponseFinished: TWinHttpOnResponseFinished; const onResponseStart: TWinHttpOnResponseStart);
-begin
-  FOnError := onError;
-  FOnResponseDataAvailable := onResponseDataAvailable;
-  FOnResponseFinished := onResponseFinished;
-  FOnResponseStart := onResponseStart;
-end;
-
-procedure TWinHttpEvents.OnError(ErrorNumber: Integer; const ErrorDescription: WideString);
-begin
-  if Assigned(FOnError) then
-    FOnError(ErrorNumber, ErrorDescription);
-end;
-
-procedure TWinHttpEvents.OnResponseDataAvailable(var Data: PSafeArray);
-begin
-  if Assigned(FOnResponseDataAvailable) then
-    FOnResponseDataAvailable(Data);
-end;
-
-procedure TWinHttpEvents.OnResponseFinished;
-begin
-  if Assigned(FOnResponseFinished) then
-    FOnResponseFinished;
-end;
-
-procedure TWinHttpEvents.OnResponseStart(Status: Integer; const ContentType: WideString);
-begin
-  if Assigned(FOnResponseStart) then
-    FOnResponseStart(Status, ContentType);
+  result := WinHttpAddRequestHeaders(hRequest, PWideChar(sHeaders), $ffffffff, WINHTTP_ADDREQ_FLAG_ADD);
 end;
 
 end.

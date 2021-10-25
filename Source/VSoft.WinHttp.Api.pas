@@ -1,48 +1,31 @@
-﻿{***************************************************************************}
-{                                                                           }
-{           VSoft.HttpClient - A wrapper over WinHttp                       }
-{                              modelled on restSharp                        }
-{                                                                           }
-{           Copyright � 2020 Vincent Parrett and contributors               }
-{                                                                           }
-{           vincent@finalbuilder.com                                        }
-{           https://www.finalbuilder.com                                    }
-{                                                                           }
-{                                                                           }
-{***************************************************************************}
-{                                                                           }
-{  Licensed under the Apache License, Version 2.0 (the "License");          }
-{  you may not use this file except in compliance with the License.         }
-{  You may obtain a copy of the License at                                  }
-{                                                                           }
-{      http://www.apache.org/licenses/LICENSE-2.0                           }
-{                                                                           }
-{  Unless required by applicable law or agreed to in writing, software      }
-{  distributed under the License is distributed on an "AS IS" BASIS,        }
-{  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
-{  See the License for the specific language governing permissions and      }
-{  limitations under the License.                                           }
-{                                                                           }
-{***************************************************************************}
-
 {
+
 Copyright (c) Microsoft Corporation. All rights reserved.
+
 Module Name:
+
     winhttp.h
+
 Abstract:
+
     Contains manifests, macros, types and prototypes for Windows HTTP Services
+
 }
 
-unit VSoft.HttpClient.WinHttp.Api;
-
+unit VSoft.WinHttp.Api;
 
 {$ALIGN ON}
 {$MINENUMSIZE 4}
+{$WARN SYMBOL_PLATFORM OFF}
+
 
 interface
 
-uses Winapi.Windows,
-     Winapi.Winsock2;
+uses Winapi.Windows, Winapi.Winsock2;
+
+//
+// types
+//
 
 type
   HINTERNET = Pointer;
@@ -53,23 +36,23 @@ type
   TInternetPort = INTERNET_PORT;
   PInternetPort = ^TInternetPort;
 
-
-{ manifests }
-
+//
+// manifests
+//
 
 const
   INTERNET_DEFAULT_PORT = 0;                    // use the protocol-specific default
-  INTERNET_DEFAULT_HTTP_PORT = 80;              // HTTP
-  INTERNET_DEFAULT_HTTPS_PORT = 443;            // HTTPS
+  INTERNET_DEFAULT_HTTP_PORT = 80;              //    "     "  HTTP   "
+  INTERNET_DEFAULT_HTTPS_PORT = 443;            //    "     "  HTTPS  "
 
-//flags for WinHttpOpen()
+// flags for WinHttpOpen():
   WINHTTP_FLAG_ASYNC = $10000000;               // this session is asynchronous (where supported)
 
-//flags for WinHttpOpenRequest():
+// flags for WinHttpOpenRequest():
   WINHTTP_FLAG_SECURE = $00800000;                 // use SSL if applicable (HTTPS)
   WINHTTP_FLAG_ESCAPE_PERCENT = $00000004;         // if escaping enabled, escape percent as well
   WINHTTP_FLAG_NULL_CODEPAGE = $00000008;          // assume all symbols are ASCII, use fast convertion
-  WINHTTP_FLAG_BYPASS_PROXY_CACHE = $00000100;    // add "pragma: no-cache" request header
+  WINHTTP_FLAG_BYPASS_PROXY_CACHE = $00000100;     // add "pragma: no-cache" request header
   WINHTTP_FLAG_REFRESH = WINHTTP_FLAG_BYPASS_PROXY_CACHE;
   WINHTTP_FLAG_ESCAPE_DISABLE = $00000040;         // disable escaping
   WINHTTP_FLAG_ESCAPE_DISABLE_QUERY = $00000080;   // if escaping enabled escape path part, but do not escape query
@@ -78,6 +61,16 @@ const
   SECURITY_FLAG_IGNORE_CERT_DATE_INVALID = $00002000;  // expired X509 Cert.
   SECURITY_FLAG_IGNORE_CERT_CN_INVALID = $00001000;    // bad common name in X509 Cert.
   SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE = $00000200;
+
+
+// WINHTTP_ASYNC_RESULT - this structure is returned to the application via
+// the callback with WINHTTP_CALLBACK_STATUS_REQUEST_COMPLETE. It is not sufficient to
+// just return the result of the async operation. If the API failed then the
+// app cannot call GetLastError() because the thread context will be incorrect.
+// Both the value returned by the async API and any resultant error code are
+// made available. The app need not check dwError if dwResult indicates that
+// the API succeeded (in this case dwError will be ERROR_SUCCESS)
+
 
 type
   WINHTTP_ASYNC_RESULT = record
@@ -88,6 +81,11 @@ type
   TWinHttpAsyncResult = WINHTTP_ASYNC_RESULT;
   PWinHttpAsyncResult = ^TWinHttpAsyncResult;
 
+
+//
+// HTTP_VERSION_INFO - query or set global HTTP version (1.0 or 1.1)
+//
+
   HTTP_VERSION_INFO = record
     dwMajorVersion: DWORD;
     dwMinorVersion: DWORD;
@@ -96,6 +94,9 @@ type
   THttpVersionInfo = HTTP_VERSION_INFO;
   PHttpVersionInfo = ^THttpVersionInfo;
 
+//
+// INTERNET_SCHEME - URL scheme type
+//
 
   INTERNET_SCHEME = Integer;
   LPINTERNET_SCHEME = ^INTERNET_SCHEME;
@@ -109,22 +110,23 @@ const
 //
 // URL_COMPONENTS - the constituent parts of an URL. Used in WinHttpCrackUrl()
 // and WinHttpCreateUrl()
-//
+
 // For WinHttpCrackUrl(), if a pointer field and its corresponding length field
 // are both 0 then that component is not returned. If the pointer field is NULL
 // but the length field is not zero, then both the pointer and length fields are
 // returned if both pointer and corresponding length fields are non-zero then
 // the pointer field points to a buffer where the component is copied. The
 // component may be un-escaped, depending on dwFlags
-//
+
 // For WinHttpCreateUrl(), the pointer fields should be NULL if the component
 // is not required. If the corresponding length field is zero then the pointer
 // field is the address of a zero-terminated string. If the length field is not
 // zero then it is the string length of the corresponding pointer field
-//
+
+
 
 type
-  URL_COMPONENTS = record
+  _URL_COMPONENTS = record
     dwStructSize: DWORD;        // size of this structure. Used in version check
     lpszScheme: LPWSTR;         // pointer to scheme name
     dwSchemeLength: DWORD;      // length of scheme name
@@ -141,6 +143,7 @@ type
     lpszExtraInfo: LPWSTR;      // pointer to extra information (e.g. ?foo or #foo)
     dwExtraInfoLength: DWORD;   // length of extra information
   end;
+  URL_COMPONENTS = _URL_COMPONENTS;
   LPURL_COMPONENTS = ^URL_COMPONENTS;
   TURLComponents = URL_COMPONENTS;
   PURLComponents = ^TURLComponents;
@@ -150,13 +153,14 @@ type
   TURLComponentsW = URL_COMPONENTS;
   PURLComponentsW = ^TURLComponents;
 
+// WINHTTP_PROXY_INFO - structure supplied with WINHTTP_OPTION_PROXY to get/
+// set proxy information on a WinHttpOpen() handle
 
   WINHTTP_PROXY_INFO = record
     dwAccessType: DWORD;      // see WINHTTP_ACCESS_* types below
     lpszProxy: LPWSTR;        // proxy server list
     lpszProxyBypass: LPWSTR;  // proxy bypass list
   end;
-
   LPWINHTTP_PROXY_INFO = ^WINHTTP_PROXY_INFO;
   PWINHTTP_PROXY_INFO = ^WINHTTP_PROXY_INFO;
   TWinHttpProxyInfo = WINHTTP_PROXY_INFO;
@@ -181,6 +185,7 @@ type
   TWinHttpAutoProxyOptions = WINHTTP_AUTOPROXY_OPTIONS;
   PWinHttpAutoProxyOptions = ^TWinHttpAutoProxyOptions;
 
+
 const
   WINHTTP_AUTOPROXY_AUTO_DETECT = $00000001;
   WINHTTP_AUTOPROXY_CONFIG_URL = $00000002;
@@ -189,25 +194,25 @@ const
   WINHTTP_AUTOPROXY_RUN_INPROCESS = $00010000;
   WINHTTP_AUTOPROXY_RUN_OUTPROCESS_ONLY = $00020000;
 
-
-//Flags for dwAutoDetectFlags
+// Flags for dwAutoDetectFlags
 
   WINHTTP_AUTO_DETECT_TYPE_DHCP = $00000001;
   WINHTTP_AUTO_DETECT_TYPE_DNS_A = $00000002;
 
-//WINHTTP_CERTIFICATE_INFO lpBuffer - contains the certificate returned from the server
+// WINHTTP_CERTIFICATE_INFO lpBuffer - contains the certificate returned from the server
 
 
 type
   WINHTTP_CERTIFICATE_INFO = record
-    ftExpiry: FILETIME;           // ftExpiry - date the certificate expires.
-    ftStart: FILETIME;            // ftStart - date the certificate becomes valid.
-    lpszSubjectInfo: LPWSTR;      // lpszSubjectInfo - the name of organization, site, and server the cert. was issued for.
-    lpszIssuerInfo: LPWSTR;       // lpszIssuerInfo - the name of orgainzation, site, and server the cert was issues by.
-    lpszProtocolName: LPWSTR;     // lpszProtocolName - the name of the protocol used to provide the secure connection.
-    lpszSignatureAlgName: LPWSTR; // lpszSignatureAlgName - the name of the algorithm used for signing the certificate.
-    lpszEncryptionAlgName: LPWSTR;// lpszEncryptionAlgName - the name of the algorithm used for doing encryption over the secure channel (SSL) connection.
-    dwKeySize: DWORD;             // dwKeySize - size of the key.
+
+    ftExpiry: FILETIME;             // date the certificate expires.
+    ftStart: FILETIME;              // date the certificate becomes valid.
+    lpszSubjectInfo: LPWSTR;        // the name of organization, site, and server  the cert. was issued for.
+    lpszIssuerInfo: LPWSTR;         // the name of orgainzation, site, and server the cert was issues by.
+    lpszProtocolName: LPWSTR;       // the name of the protocol used to provide the secure connection.
+    lpszSignatureAlgName: LPWSTR;   // the name of the algorithm used for signing the certificate.
+    lpszEncryptionAlgName: LPWSTR;  // the name of the algorithm used for doing encryption over the secure channel (SSL) connection.
+    dwKeySize: DWORD;               // size of the key.
   end;
   TWinHttpCertificateInfo = WINHTTP_CERTIFICATE_INFO;
   PWinHttpCertificateInfo = ^TWinHttpCertificateInfo;
@@ -221,39 +226,50 @@ type
   TWinHttpConnectionInfo = WINHTTP_CONNECTION_INFO;
   PWinHttpConnectionInfo = ^TWinHttpConnectionInfo;
 
+
+// prototypes
+
+// constants for WinHttpTimeFromSystemTime
+
 const
   WINHTTP_TIME_FORMAT_BUFSIZE = 62;
 
 function WinHttpTimeFromSystemTime(var pst: TSystemTime; pwszTime: LPWSTR): BOOL; stdcall;
+
 function WinHttpTimeToSystemTime(pwszTime: LPCWSTR; out pst: TSystemTime): BOOL; stdcall;
 
-//crackurl/combineurl flags
+// flags for CrackUrl() and CombineUrl()
+
+
 const
-  ICU_NO_ENCODE = $20000000;    // Don't convert unsafe characters to escape sequence
-  ICU_DECODE = $10000000;       // Convert %XX escape sequences to characters
-  ICU_NO_META = $08000000;      // Don't convert .. etc. meta path sequences
-  ICU_ENCODE_SPACES_ONLY = $04000000;  // Encode spaces only
-  ICU_BROWSER_MODE = $02000000; // Special encode/decode rules for browser
-  ICU_ENCODE_PERCENT = $00001000;           // Encode any percent (ASCII25)  signs encountered, default is to not encode percent.
+  ICU_NO_ENCODE = $20000000;          // Don't convert unsafe characters to escape sequence
+  ICU_DECODE = $10000000;             // Convert %XX escape sequences to characters
+  ICU_NO_META = $08000000;            // Don't convert .. etc. meta path sequences
+  ICU_ENCODE_SPACES_ONLY = $04000000; // Encode spaces only
+  ICU_BROWSER_MODE = $02000000;       // Special encode/decode rules for browser
+  ICU_ENCODE_PERCENT = $00001000;     // Encode any percent (ASCII25) signs encountered, default is to not encode percent.
 
 
 function WinHttpCrackUrl(pwszUrl: LPCWSTR; dwUrlLength: DWORD; dwFlags: DWORD; var lpUrlComponents: TURLComponents): BOOL; stdcall;
 
 function WinHttpCreateUrl(var lpUrlComponents: TURLComponents; dwFlags: DWORD; pwszUrl: LPWSTR; var pdwUrlLength: DWORD): BOOL; stdcall;
 
-//flags for WinHttpCrackUrl/WinHttpCreateUrl
+// flags for WinHttpCrackUrl() and WinHttpCreateUrl()
 
 const
-  ICU_ESCAPE = $80000000;       //{ (un)escape URL characters
+  ICU_ESCAPE = $80000000;           // (un)escape URL characters
   ICU_ESCAPE_AUTHORITY = $00002000; // causes InternetCreateUrlA to escape chars in authority components (user, pwd, host)
   ICU_REJECT_USERPWD = $00004000;   // rejects usrls whick have username/pwd sections
 
 function WinHttpCheckPlatform: BOOL; stdcall;
+
+
 function WinHttpGetDefaultProxyConfiguration(var pProxyInfo: TWinHttpProxyInfo): BOOL; stdcall;
 function WinHttpSetDefaultProxyConfiguration(var pProxyInfo: TWinHttpProxyInfo): BOOL; stdcall;
+
 function WinHttpOpen(pszAgentW: LPCWSTR; dwAccessType: DWORD; pszProxyW: LPCWSTR; pszProxyBypassW: LPCWSTR; dwFlags: DWORD): HINTERNET; stdcall;
 
-//WinHttpOpen dwAccessType values (also for WINHTTP_PROXY_INFO::dwAccessType)
+// WinHttpOpen dwAccessType values (also for WINHTTP_PROXY_INFO::dwAccessType)
 const
   WINHTTP_ACCESS_TYPE_DEFAULT_PROXY = 0;
   WINHTTP_ACCESS_TYPE_NO_PROXY = 1;
@@ -275,6 +291,7 @@ function WinHttpQueryDataAvailable(hRequest: HINTERNET; lpdwNumberOfBytesAvailab
 
 function WinHttpQueryOption(hInternet: HINTERNET; dwOption: DWORD; out lpBuffer; var lpdwBufferLength: DWORD): BOOL; stdcall;
 
+
 const
   WINHTTP_NO_CLIENT_CERT_CONTEXT = nil;
 
@@ -284,9 +301,8 @@ function WinHttpSetTimeouts(hInternet: HINTERNET; nResolveTimeout: Integer; nCon
 
 function WinHttpIsHostInProxyBypassList(var pProxyInfo: TWinHttpProxyInfo; pwszHost: LPCWSTR; tScheme: TInternetScheme; nPort: TInternetPort; out pfIsInBypassList: BOOL): DWORD; stdcall;
 
-//
-// options manifests for WinHttp{Query|Set}Option
-//
+
+// options manifests for WinHttp(Query|Set)Option
 
 const
   WINHTTP_OPTION_CALLBACK = 1;
@@ -306,7 +322,6 @@ const
   WINHTTP_OPTION_URL = 34;
   WINHTTP_OPTION_SECURITY_KEY_BITNESS = 36;
   WINHTTP_OPTION_PROXY = 38;
-
 
   WINHTTP_OPTION_USER_AGENT = 41;
   WINHTTP_OPTION_CONTEXT_VALUE = 45;
@@ -348,6 +363,7 @@ const
   WINHTTP_OPTION_RECEIVE_PROXY_CONNECT_RESPONSE = 103;
   WINHTTP_OPTION_IS_PROXY_CONNECT_RESPONSE = 104;
 
+
   WINHTTP_OPTION_SERVER_SPN_USED = 106;
   WINHTTP_OPTION_PROXY_SPN_USED = 107;
 
@@ -355,14 +371,18 @@ const
 
   WINHTTP_OPTION_DECOMPRESSION = 118;
 
+  WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL = 133;
+  WINHTTP_OPTION_HTTP_PROTOCOL_USED = 134;
+
   WINHTTP_FIRST_OPTION = WINHTTP_OPTION_CALLBACK;
 
-  WINHTTP_LAST_OPTION = WINHTTP_OPTION_SERVER_CBT;
+  WINHTTP_LAST_OPTION = WINHTTP_OPTION_HTTP_PROTOCOL_USED;
 
   WINHTTP_OPTION_USERNAME = $1000;
   WINHTTP_OPTION_PASSWORD = $1001;
   WINHTTP_OPTION_PROXY_USERNAME = $1002;
   WINHTTP_OPTION_PROXY_PASSWORD = $1003;
+
 
 // manifest value for WINHTTP_OPTION_MAX_CONNS_PER_SERVER and WINHTTP_OPTION_MAX_CONNS_PER_1_0_SERVER
   WINHTTP_CONNS_PER_SERVER_UNLIMITED = $FFFFFFFF;
@@ -387,6 +407,7 @@ const
   WINHTTP_DISABLE_PASSPORT_KEYRING = $20000000;
   WINHTTP_ENABLE_PASSPORT_KEYRING = $40000000;
 
+
 // values for WINHTTP_OPTION_DISABLE_FEATURE
   WINHTTP_DISABLE_COOKIES = $00000001;
   WINHTTP_DISABLE_REDIRECTS = $00000002;
@@ -401,7 +422,6 @@ const
   WINHTTP_DISABLE_SPN_SERVER_PORT = $00000000;
   WINHTTP_ENABLE_SPN_SERVER_PORT = $00000001;
   WINHTTP_OPTION_SPN_MASK = WINHTTP_ENABLE_SPN_SERVER_PORT;
-  {$EXTERNALSYM WINHTTP_OPTION_SPN_MASK}
 
 type
   PWINHTTP_CREDS = ^WINHTTP_CREDS;
@@ -414,12 +434,11 @@ type
     dwPort: DWORD;
   end;
   tagWINHTTP_CREDS = WINHTTP_CREDS;
-  {$EXTERNALSYM WINHTTP_CREDS}
-  {$EXTERNALSYM PWINHTTP_CREDS}
   TWinHttpCreds = WINHTTP_CREDS;
   PWinHttpCreds = ^TWinHttpCreds;
 
-// structure for WINHTTP_OPTION_GLOBAL_SERVER_CREDS and WINHTTP_OPTION_GLOBAL_PROXY_CREDS
+// structure for WINHTTP_OPTION_GLOBAL_SERVER_CREDS and
+// WINHTTP_OPTION_GLOBAL_PROXY_CREDS
   PWINHTTP_CREDS_EX = ^WINHTTP_CREDS_EX;
   WINHTTP_CREDS_EX = record
     lpszUserName: LPSTR;
@@ -436,12 +455,15 @@ type
 
 
 // winhttp handle types
+
 const
   WINHTTP_HANDLE_TYPE_SESSION = 1;
   WINHTTP_HANDLE_TYPE_CONNECT = 2;
   WINHTTP_HANDLE_TYPE_REQUEST = 3;
 
+
 // values for auth schemes
+
   WINHTTP_AUTH_SCHEME_BASIC = $00000001;
   WINHTTP_AUTH_SCHEME_NTLM = $00000002;
   WINHTTP_AUTH_SCHEME_PASSPORT = $00000004;
@@ -449,16 +471,21 @@ const
   WINHTTP_AUTH_SCHEME_NEGOTIATE = $00000010;
 
 // WinHttp supported Authentication Targets
+
   WINHTTP_AUTH_TARGET_SERVER = $00000000;
   WINHTTP_AUTH_TARGET_PROXY = $00000001;
 
+
 // values for WINHTTP_OPTION_SECURITY_FLAGS
+
 
 // query only
   SECURITY_FLAG_SECURE = $00000001;                    // can query only
   SECURITY_FLAG_STRENGTH_WEAK = $10000000;
   SECURITY_FLAG_STRENGTH_MEDIUM = $40000000;
   SECURITY_FLAG_STRENGTH_STRONG = $20000000;
+
+
 
 // Secure connection error status flags
   WINHTTP_CALLBACK_STATUS_FLAG_CERT_REV_FAILED = $00000001;
@@ -487,16 +514,23 @@ const
   WINHTTP_DECOMPRESSION_FLAG_ALL = WINHTTP_DECOMPRESSION_FLAG_GZIP or
                                    WINHTTP_DECOMPRESSION_FLAG_DEFLATE;
 
+  WINHTTP_PROTOCOL_FLAG_HTTP2 = $1;
+  WINHTTP_PROTOCOL_MASK = WINHTTP_PROTOCOL_FLAG_HTTP2;
+
+
 // callback function for WinHttpSetStatusCallback
 
 
 type
   LPWINHTTP_STATUS_CALLBACK = ^WINHTTP_STATUS_CALLBACK;
-  WINHTTP_STATUS_CALLBACK = procedure(hInternet: HINTERNET; dwContext: Pointer; dwInternetStatus: DWORD;  lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD); stdcall;
+  WINHTTP_STATUS_CALLBACK = procedure(hInternet: HINTERNET; dwContext: Pointer; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD); stdcall;
   TWinHttpStatusCallback = WINHTTP_STATUS_CALLBACK;
   PWinHttpStatusCallback = ^TWinHttpStatusCallback;
 
-function WinHttpSetStatusCallback(hInternet: HINTERNET; lpfnInternetCallback: TWinHttpStatusCallback; dwNotificationFlags: DWORD;  dwReserved: NativeUInt): TWinHttpStatusCallback; stdcall;
+
+
+function WinHttpSetStatusCallback(hInternet: HINTERNET; lpfnInternetCallback: TWinHttpStatusCallback; dwNotificationFlags: DWORD; dwReserved: NativeUInt): TWinHttpStatusCallback; stdcall;
+
 
 
 // status manifests for WinHttp status callback
@@ -528,11 +562,11 @@ const
 
 
 // API Enums for WINHTTP_CALLBACK_STATUS_REQUEST_ERROR:
-  API_RECEIVE_RESPONSE = (1);
-  API_QUERY_DATA_AVAILABLE = (2);
-  API_READ_DATA = (3);
-  API_WRITE_DATA = (4);
-  API_SEND_REQUEST = (5);
+  API_RECEIVE_RESPONSE = 1;
+  API_QUERY_DATA_AVAILABLE = 2;
+  API_READ_DATA = 3;
+  API_WRITE_DATA = 4;
+  API_SEND_REQUEST = 5;
 
 
   WINHTTP_CALLBACK_FLAG_RESOLVE_NAME = WINHTTP_CALLBACK_STATUS_RESOLVING_NAME or WINHTTP_CALLBACK_STATUS_NAME_RESOLVED;
@@ -552,6 +586,7 @@ const
   WINHTTP_CALLBACK_FLAG_WRITE_COMPLETE = WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE;
   WINHTTP_CALLBACK_FLAG_REQUEST_ERROR = WINHTTP_CALLBACK_STATUS_REQUEST_ERROR;
 
+
   WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS = WINHTTP_CALLBACK_STATUS_SENDREQUEST_COMPLETE
                                                         or WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE
                                                         or WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE
@@ -560,22 +595,22 @@ const
                                                         or WINHTTP_CALLBACK_STATUS_REQUEST_ERROR;
   WINHTTP_CALLBACK_FLAG_ALL_NOTIFICATIONS = $ffffffff;
 
-//
+
 // if the following value is returned by WinHttpSetStatusCallback, then
 // probably an invalid (non-code) address was supplied for the callback
-//
+
 
   WINHTTP_INVALID_STATUS_CALLBACK: TWinHttpStatusCallback = Pointer(-1);
 
 
-//
+
 // WinHttpQueryHeaders info levels. Generally, there is one info level
 // for each potential RFC822/HTTP/MIME header that an HTTP server
 // may send as part of a request response.
-//
-// The WINHTTP_QUERY_RAW_HEADERS info level is provided for clien
+
+// The WINHTTP_QUERY_RAW_HEADERS info level is provided for clients
 // that choose to perform their own header parsing.
-//
+
 
 
   WINHTTP_QUERY_MIME_VERSION = 0;
@@ -655,6 +690,8 @@ const
   WINHTTP_QUERY_PROXY_CONNECTION = 69;
   WINHTTP_QUERY_UNLESS_MODIFIED_SINCE = 70;
 
+
+
   WINHTTP_QUERY_PROXY_SUPPORT = 75;
   WINHTTP_QUERY_AUTHENTICATION_INFO = 76;
   WINHTTP_QUERY_PASSPORT_URLS = 77;
@@ -662,36 +699,36 @@ const
 
   WINHTTP_QUERY_MAX = 78;
 
-//
+
 // WINHTTP_QUERY_CUSTOM - if this special value is supplied as the dwInfoLevel
 // parameter of WinHttpQueryHeaders() then the lpBuffer parameter contains the name
 // of the header we are to query
-//
+
 
   WINHTTP_QUERY_CUSTOM = 65535;
 
-//
+
 // WINHTTP_QUERY_FLAG_REQUEST_HEADERS - if this bit is set in the dwInfoLevel
 // parameter of WinHttpQueryHeaders() then the request headers will be queried for the
 // request information
-//
+
 
   WINHTTP_QUERY_FLAG_REQUEST_HEADERS = $80000000;
 
-//
+
 // WINHTTP_QUERY_FLAG_SYSTEMTIME - if this bit is set in the dwInfoLevel parameter
 // of WinHttpQueryHeaders() AND the header being queried contains date information,
 // e.g. the "Expires:" header then lpBuffer will contain a SYSTEMTIME structure
 // containing the date and time information converted from the header string
-//
+
 
   WINHTTP_QUERY_FLAG_SYSTEMTIME = $40000000;
 
-//
+
 // WINHTTP_QUERY_FLAG_NUMBER - if this bit is set in the dwInfoLevel parameter of
 // HttpQueryHeader(), then the value of the header will be converted to a number
 // before being returned to the caller, if applicable
-//
+
 
   WINHTTP_QUERY_FLAG_NUMBER = $20000000;
 
@@ -700,58 +737,60 @@ const
 
 // HTTP Response Status Codes:
 
-  HTTP_STATUS_CONTINUE = 100;           //OK to continue with request
-  HTTP_STATUS_SWITCH_PROTOCOLS = 101;   //server has switched protocols in upgrade header
 
-  HTTP_STATUS_OK = 200;                 //request completed
-  HTTP_STATUS_CREATED = 201;            //object created, reason = new URI
-  HTTP_STATUS_ACCEPTED = 202;           //async completion (TBS)
-  HTTP_STATUS_PARTIAL = 203;            //partial completion
-  HTTP_STATUS_NO_CONTENT = 204;         //no info to return
-  HTTP_STATUS_RESET_CONTENT = 205;      //request completed, but clear form
-  HTTP_STATUS_PARTIAL_CONTENT = 206;    //partial GET fulfilled
-  HTTP_STATUS_WEBDAV_MULTI_STATUS = 207; //WebDAV Multi-Status
+  HTTP_STATUS_CONTINUE = 100;           // OK to continue with request
+  HTTP_STATUS_SWITCH_PROTOCOLS = 101;   // server has switched protocols in upgrade header
 
-  HTTP_STATUS_AMBIGUOUS = 300;          //server couldn't decide what to return
-  HTTP_STATUS_MOVED = 301;              //object permanently moved
-  HTTP_STATUS_REDIRECT = 302;           //object temporarily moved
-  HTTP_STATUS_REDIRECT_METHOD = 303;    //redirection w/ new access method
-  HTTP_STATUS_NOT_MODIFIED = 304;       //if-modified-since was not modified
-  HTTP_STATUS_USE_PROXY = 305;          //redirection to proxy, location header specifies proxy to use
-  HTTP_STATUS_REDIRECT_KEEP_VERB = 307; //HTTP/1.1: keep same verb
+  HTTP_STATUS_OK = 200;                 // request completed
+  HTTP_STATUS_CREATED = 201;            // object created, reason = new URI
+  HTTP_STATUS_ACCEPTED = 202;           // async completion (TBS)
+  HTTP_STATUS_PARTIAL = 203;            // partial completion
+  HTTP_STATUS_NO_CONTENT = 204;         // no info to return
+  HTTP_STATUS_RESET_CONTENT = 205;      // request completed, but clear form
+  HTTP_STATUS_PARTIAL_CONTENT = 206;    // partial GET fulfilled
+  HTTP_STATUS_WEBDAV_MULTI_STATUS = 207; // WebDAV Multi-Status
 
-  HTTP_STATUS_BAD_REQUEST = 400;        //invalid syntax
-  HTTP_STATUS_DENIED = 401;             //access denied
-  HTTP_STATUS_PAYMENT_REQ = 402;        //payment required
-  HTTP_STATUS_FORBIDDEN = 403;          //request forbidden
-  HTTP_STATUS_NOT_FOUND = 404;          //object not found
-  HTTP_STATUS_BAD_METHOD = 405;         //method is not allowed
-  HTTP_STATUS_NONE_ACCEPTABLE = 406;    //no response acceptable to client found
-  HTTP_STATUS_PROXY_AUTH_REQ = 407;     //proxy authentication required
-  HTTP_STATUS_REQUEST_TIMEOUT = 408;    //server timed out waiting for request
-  HTTP_STATUS_CONFLICT = 409;           //user should resubmit with more info
-  HTTP_STATUS_GONE = 410;               //the resource is no longer available
-  HTTP_STATUS_LENGTH_REQUIRED = 411;    //the server refused to accept request w/o a length
-  HTTP_STATUS_PRECOND_FAILED = 412;     //precondition given in request failed
-  HTTP_STATUS_REQUEST_TOO_LARGE = 413;  //request entity was too large
-  HTTP_STATUS_URI_TOO_LONG = 414;       //request URI too long
-  HTTP_STATUS_UNSUPPORTED_MEDIA = 415;  //unsupported media type
-  HTTP_STATUS_RETRY_WITH = 449;         //retry after doing the appropriate action.
+  HTTP_STATUS_AMBIGUOUS = 300;          // server couldn't decide what to return
+  HTTP_STATUS_MOVED = 301;              // object permanently moved
+  HTTP_STATUS_REDIRECT = 302;           // object temporarily moved
+  HTTP_STATUS_REDIRECT_METHOD = 303;    // redirection w/ new access method
+  HTTP_STATUS_NOT_MODIFIED = 304;       // if-modified-since was not modified
+  HTTP_STATUS_USE_PROXY = 305;          // redirection to proxy, location header specifies proxy to use
+  HTTP_STATUS_REDIRECT_KEEP_VERB = 307; // HTTP/1.1: keep same verb
 
-  HTTP_STATUS_SERVER_ERROR = 500;       //internal server error
-  HTTP_STATUS_NOT_SUPPORTED = 501;      //required not supported
-  HTTP_STATUS_BAD_GATEWAY = 502;        //error response received from gateway
-  HTTP_STATUS_SERVICE_UNAVAIL = 503;    //temporarily overloaded
-  HTTP_STATUS_GATEWAY_TIMEOUT = 504;    //timed out waiting for gateway
-  HTTP_STATUS_VERSION_NOT_SUP = 505;    //HTTP version not supported
+  HTTP_STATUS_BAD_REQUEST = 400;        // invalid syntax
+  HTTP_STATUS_DENIED = 401;             // access denied
+  HTTP_STATUS_PAYMENT_REQ = 402;        // payment required
+  HTTP_STATUS_FORBIDDEN = 403;          // request forbidden
+  HTTP_STATUS_NOT_FOUND = 404;          // object not found
+  HTTP_STATUS_BAD_METHOD = 405;         // method is not allowed
+  HTTP_STATUS_NONE_ACCEPTABLE = 406;    // no response acceptable to client found
+  HTTP_STATUS_PROXY_AUTH_REQ = 407;     // proxy authentication required
+  HTTP_STATUS_REQUEST_TIMEOUT = 408;    // server timed out waiting for request
+  HTTP_STATUS_CONFLICT = 409;           // user should resubmit with more info
+  HTTP_STATUS_GONE = 410;               // the resource is no longer available
+  HTTP_STATUS_LENGTH_REQUIRED = 411;    // the server refused to accept request w/o a length
+  HTTP_STATUS_PRECOND_FAILED = 412;     // precondition given in request failed
+  HTTP_STATUS_REQUEST_TOO_LARGE = 413;  // request entity was too large
+  HTTP_STATUS_URI_TOO_LONG = 414;       // request URI too long
+  HTTP_STATUS_UNSUPPORTED_MEDIA = 415;  // unsupported media type
+  HTTP_STATUS_RETRY_WITH = 449;         // retry after doing the appropriate action.
+
+  HTTP_STATUS_SERVER_ERROR = 500;       // internal server error
+  HTTP_STATUS_NOT_SUPPORTED = 501;      // required not supported
+  HTTP_STATUS_BAD_GATEWAY = 502;        // error response received from gateway
+  HTTP_STATUS_SERVICE_UNAVAIL = 503;    // temporarily overloaded
+  HTTP_STATUS_GATEWAY_TIMEOUT = 504;    // timed out waiting for gateway
+  HTTP_STATUS_VERSION_NOT_SUP = 505;    // HTTP version not supported
 
   HTTP_STATUS_FIRST = HTTP_STATUS_CONTINUE;
   HTTP_STATUS_LAST = HTTP_STATUS_VERSION_NOT_SUP;
 
+
 // prototypes
 
 
-function WinHttpOpenRequest(hConnect: HINTERNET; pwszVerb: LPCWSTR; pwszObjectName: LPCWSTR; pwszVersion: LPCWSTR; pwszReferrer: LPCWSTR; ppwszAcceptTypes: PLPWSTR; dwFlags: DWORD): HINTERNET; stdcall;
+function WinHttpOpenRequest(hConnect: HINTERNET; pwszVerb: LPCWSTR; pwszObjectName: LPCWSTR; pwszVersion: LPCWSTR;pwszReferrer: LPCWSTR; ppwszAcceptTypes: PLPWSTR; dwFlags: DWORD): HINTERNET; stdcall;
 
 // WinHttpOpenRequest prettifers for optional parameters
 const
@@ -768,60 +807,64 @@ const
   WINHTTP_ADDREQ_INDEX_MASK = $0000FFFF;
   WINHTTP_ADDREQ_FLAGS_MASK = $FFFF0000;
 
-//
+
 // WINHTTP_ADDREQ_FLAG_ADD_IF_NEW - the header will only be added if it doesn't
 // already exist
-//
+
 
   WINHTTP_ADDREQ_FLAG_ADD_IF_NEW = $10000000;
 
-//
+
 // WINHTTP_ADDREQ_FLAG_ADD - if WINHTTP_ADDREQ_FLAG_REPLACE is set but the header is
 // not found then if this flag is set, the header is added anyway, so long as
 // there is a valid header-value
-//
+
 
   WINHTTP_ADDREQ_FLAG_ADD = $20000000;
 
-//
+
 // WINHTTP_ADDREQ_FLAG_COALESCE - coalesce headers with same name. e.g.
 // "Accept: text/*" and "Accept: audio/*" with this flag results in a single
 // header: "Accept: text/*, audio/*"
-//
+
 
   WINHTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA = $40000000;
   WINHTTP_ADDREQ_FLAG_COALESCE_WITH_SEMICOLON = $01000000;
   WINHTTP_ADDREQ_FLAG_COALESCE = WINHTTP_ADDREQ_FLAG_COALESCE_WITH_COMMA;
 
 
-//
 // WINHTTP_ADDREQ_FLAG_REPLACE - replaces the specified header. Only one header can
 // be supplied in the buffer. If the header to be replaced is not the first
 // in a list of headers with the same name, then the relative index should be
 // supplied in the low 8 bits of the dwModifiers parameter. If the header-value
 // part is missing, then the header is removed
-//
+
 
   WINHTTP_ADDREQ_FLAG_REPLACE = $80000000;
 
   WINHTTP_IGNORE_REQUEST_TOTAL_LENGTH = 0;
 
-function WinHttpSendRequest(hRequest: HINTERNET; lpszHeaders: LPCWSTR; dwHeadersLength: DWORD; lpOptional: Pointer; dwOptionalLength: DWORD;  dwTotalLength: DWORD; dwContext: DWORD_PTR): BOOL; stdcall;
+function WinHttpSendRequest(hRequest: HINTERNET; lpszHeaders: LPCWSTR; dwHeadersLength: DWORD; lpOptional: Pointer; dwOptionalLength: DWORD; dwTotalLength: DWORD; dwContext: DWORD_PTR): BOOL; stdcall;
 
 // WinHttpSendRequest prettifiers for optional parameters.
 const
   WINHTTP_NO_ADDITIONAL_HEADERS = nil;
   WINHTTP_NO_REQUEST_DATA = nil;
 
-function WinHttpSetCredentials(hRequest: HINTERNET; AuthTargets: DWORD; AuthScheme: DWORD; pwszUserName: LPCWSTR; pwszPassword: LPCWSTR; pAuthParams: Pointer): BOOL; stdcall;
 
-function WinHttpQueryAuthSchemes(hRequest: HINTERNET; out lpdwSupportedSchemes: DWORD; out lpdwFirstScheme: DWORD; out pdwAuthTarget: DWORD): BOOL; stdcall;
+function WinHttpSetCredentials(hRequest: HINTERNET; AuthTargets: DWORD; AuthScheme: DWORD; pwszUserName: LPCWSTR;  pwszPassword: LPCWSTR; pAuthParams: Pointer): BOOL; stdcall;
+
+
+function WinHttpQueryAuthSchemes(hRequest: HINTERNET; out lpdwSupportedSchemes: DWORD; out lpdwFirstScheme: DWORD;
+  out pdwAuthTarget: DWORD): BOOL; stdcall;
 
 function WinHttpQueryAuthParams(hRequest: HINTERNET; AuthScheme: DWORD; out pAuthParams: Pointer): BOOL; stdcall;
 
+
 function WinHttpReceiveResponse(hRequest: HINTERNET; lpReserved: Pointer): BOOL; stdcall;
 
-function WinHttpQueryHeaders(hRequest: HINTERNET; dwInfoLevel: DWORD; pwszName: LPCWSTR; lpBuffer: Pointer; var lpdwBufferLength: DWORD; lpdwIndex: LPDWORD): BOOL; stdcall;
+function WinHttpQueryHeaders(hRequest: HINTERNET; dwInfoLevel: DWORD; pwszName: LPCWSTR; lpBuffer: Pointer;
+  var lpdwBufferLength: DWORD; lpdwIndex: LPDWORD): BOOL; stdcall;
 
 // WinHttpQueryHeaders prettifiers for optional parameters.
 const
@@ -829,17 +872,20 @@ const
   WINHTTP_NO_OUTPUT_BUFFER = nil;
   WINHTTP_NO_HEADER_INDEX = nil;
 
+
 function WinHttpDetectAutoProxyConfigUrl(dwAutoDetectFlags: DWORD; ppwstrAutoConfigUrl: PLPWSTR): BOOL; stdcall;
 
-//
-//Warning:
-//pProxyInfo param is a pointer to a WINHTTP_PROXY_INFO(TWinHttpProxyInfo) structure that receives the proxy setting.
-//This structure is then applied to the request handle using the WINHTTP_OPTION_PROXY(TWinHttpProxyInfo) option.
-//Free the lpszProxy and lpszProxyBypass strings contained in this structure (if they are non-NULL)
-//using the GlobalFree function.
-//
 
-function WinHttpGetProxyForUrl(hSession: HINTERNET; lpcwszUrl: LPCWSTR; var pAutoProxyOptions: TWinHttpAutoProxyOptions; var pProxyInfo: TWinHttpProxyInfo): BOOL; stdcall;
+{
+Warning:
+pProxyInfo param is a pointer to a WINHTTP_PROXY_INFO(TWinHttpProxyInfo) structure that receives the proxy setting.
+This structure is then applied to the request handle using the WINHTTP_OPTION_PROXY(TWinHttpProxyInfo) option.
+Free the lpszProxy and lpszProxyBypass strings contained in this structure (if they are non-NULL)
+using the GlobalFree function.
+}
+function WinHttpGetProxyForUrl(hSession: HINTERNET; lpcwszUrl: LPCWSTR; var pAutoProxyOptions: TWinHttpAutoProxyOptions;
+  var pProxyInfo: TWinHttpProxyInfo): BOOL; stdcall;
+
 
 type
   WINHTTP_CURRENT_USER_IE_PROXY_CONFIG = record
@@ -852,12 +898,13 @@ type
   TWinHttpCurrentUserIEProxyConfig = WINHTTP_CURRENT_USER_IE_PROXY_CONFIG;
   PWinHttpCurrentUserIEProxyConfig = ^TWinHttpCurrentUserIEProxyConfig;
 
+
 function WinHttpGetIEProxyConfigForCurrentUser(var pProxyConfig: TWinHttpCurrentUserIEProxyConfig): BOOL; stdcall;
 
 
-//
+
 // WinHttp API error returns
-//
+
 
 const
   WINHTTP_ERROR_BASE = 12000;
@@ -872,6 +919,7 @@ const
   ERROR_WINHTTP_OPTION_NOT_SETTABLE = WINHTTP_ERROR_BASE + 11;
   ERROR_WINHTTP_SHUTDOWN = WINHTTP_ERROR_BASE + 12;
 
+
   ERROR_WINHTTP_LOGIN_FAILURE = WINHTTP_ERROR_BASE + 15;
   ERROR_WINHTTP_OPERATION_CANCELLED = WINHTTP_ERROR_BASE + 17;
   ERROR_WINHTTP_INCORRECT_HANDLE_TYPE = WINHTTP_ERROR_BASE + 18;
@@ -882,17 +930,18 @@ const
 
   ERROR_WINHTTP_CLIENT_AUTH_CERT_NEEDED = WINHTTP_ERROR_BASE + 44;
 
-//
+
 // WinHttpRequest Component errors
-//
+
   ERROR_WINHTTP_CANNOT_CALL_BEFORE_OPEN = WINHTTP_ERROR_BASE + 100;
   ERROR_WINHTTP_CANNOT_CALL_BEFORE_SEND = WINHTTP_ERROR_BASE + 101;
   ERROR_WINHTTP_CANNOT_CALL_AFTER_SEND = WINHTTP_ERROR_BASE + 102;
   ERROR_WINHTTP_CANNOT_CALL_AFTER_OPEN = WINHTTP_ERROR_BASE + 103;
 
-//
+
+
 // HTTP API errors
-//
+
 
   ERROR_WINHTTP_HEADER_NOT_FOUND = WINHTTP_ERROR_BASE + 150;
   ERROR_WINHTTP_INVALID_SERVER_RESPONSE = WINHTTP_ERROR_BASE + 152;
@@ -901,13 +950,14 @@ const
   ERROR_WINHTTP_HEADER_ALREADY_EXISTS = WINHTTP_ERROR_BASE + 155;
   ERROR_WINHTTP_REDIRECT_FAILED = WINHTTP_ERROR_BASE + 156;
 
-//
-// additional WinHttp API error codes
-//
 
-//
+
+
 // additional WinHttp API error codes
-//
+
+
+
+// additional WinHttp API error codes
 
   ERROR_WINHTTP_AUTO_PROXY_SERVICE_ERROR = WINHTTP_ERROR_BASE + 178;
   ERROR_WINHTTP_BAD_AUTO_PROXY_SCRIPT = WINHTTP_ERROR_BASE + 166;
@@ -916,12 +966,13 @@ const
   ERROR_WINHTTP_NOT_INITIALIZED = WINHTTP_ERROR_BASE + 172;
   ERROR_WINHTTP_SECURE_FAILURE = WINHTTP_ERROR_BASE + 175;
 
-//
+
+
 // Certificate security errors. These are raised only by the WinHttpRequest
 // component. The WinHTTP Win32 API will return ERROR_WINHTTP_SECURE_FAILE and
 // provide additional information via the WINHTTP_CALLBACK_STATUS_SECURE_FAILURE
 // callback notification.
-//
+
   ERROR_WINHTTP_SECURE_CERT_DATE_INVALID = WINHTTP_ERROR_BASE + 37;
   ERROR_WINHTTP_SECURE_CERT_CN_INVALID = WINHTTP_ERROR_BASE + 38;
   ERROR_WINHTTP_SECURE_INVALID_CA = WINHTTP_ERROR_BASE + 45;
@@ -930,6 +981,7 @@ const
   ERROR_WINHTTP_SECURE_INVALID_CERT = WINHTTP_ERROR_BASE + 169;
   ERROR_WINHTTP_SECURE_CERT_REVOKED = WINHTTP_ERROR_BASE + 170;
   ERROR_WINHTTP_SECURE_CERT_WRONG_USAGE = WINHTTP_ERROR_BASE + 179;
+
 
   ERROR_WINHTTP_AUTODETECTION_FAILED = WINHTTP_ERROR_BASE + 180;
   ERROR_WINHTTP_HEADER_COUNT_EXCEEDED = WINHTTP_ERROR_BASE + 181;
@@ -941,40 +993,42 @@ const
 
   WINHTTP_ERROR_LAST = WINHTTP_ERROR_BASE + 186;
 
+
 implementation
 
 const
-  WinhttpapiDLL = 'winhttp.dll';
+  WinHttpDLL = 'winhttp.dll';
 
-function WinHttpAddRequestHeaders; external WinhttpapiDLL name 'WinHttpAddRequestHeaders';
-function WinHttpCheckPlatform; external WinhttpapiDLL name 'WinHttpCheckPlatform';
-function WinHttpCloseHandle; external WinhttpapiDLL name 'WinHttpCloseHandle';
-function WinHttpConnect; external WinhttpapiDLL name 'WinHttpConnect';
-function WinHttpCrackUrl; external WinhttpapiDLL name 'WinHttpCrackUrl';
-function WinHttpCreateUrl; external WinhttpapiDLL name 'WinHttpCreateUrl';
-function WinHttpDetectAutoProxyConfigUrl; external WinhttpapiDLL name 'WinHttpDetectAutoProxyConfigUrl';
-function WinHttpGetDefaultProxyConfiguration; external WinhttpapiDLL name 'WinHttpGetDefaultProxyConfiguration';
-function WinHttpGetIEProxyConfigForCurrentUser; external WinhttpapiDLL name 'WinHttpGetIEProxyConfigForCurrentUser';
-function WinHttpGetProxyForUrl; external WinhttpapiDLL name 'WinHttpGetProxyForUrl';
-function WinHttpIsHostInProxyBypassList; external WinhttpapiDLL name 'WinHttpIsHostInProxyBypassList';
-function WinHttpOpen; external WinhttpapiDLL name 'WinHttpOpen';
-function WinHttpOpenRequest; external WinhttpapiDLL name 'WinHttpOpenRequest';
-function WinHttpQueryAuthParams; external WinhttpapiDLL name 'WinHttpQueryAuthParams';
-function WinHttpQueryAuthSchemes; external WinhttpapiDLL name 'WinHttpQueryAuthSchemes';
-function WinHttpQueryDataAvailable; external WinhttpapiDLL name 'WinHttpQueryDataAvailable';
-function WinHttpQueryHeaders; external WinhttpapiDLL name 'WinHttpQueryHeaders';
-function WinHttpQueryOption; external WinhttpapiDLL name 'WinHttpQueryOption';
-function WinHttpReadData; external WinhttpapiDLL name 'WinHttpReadData';
-function WinHttpReceiveResponse; external WinhttpapiDLL name 'WinHttpReceiveResponse';
-function WinHttpSendRequest; external WinhttpapiDLL name 'WinHttpSendRequest';
-function WinHttpSetCredentials; external WinhttpapiDLL name 'WinHttpSetCredentials';
-function WinHttpSetDefaultProxyConfiguration; external WinhttpapiDLL name 'WinHttpSetDefaultProxyConfiguration';
-function WinHttpSetOption; external WinhttpapiDLL name 'WinHttpSetOption';
-function WinHttpSetStatusCallback; external WinhttpapiDLL name 'WinHttpSetStatusCallback';
-function WinHttpSetTimeouts; external WinhttpapiDLL name 'WinHttpSetTimeouts';
-function WinHttpTimeFromSystemTime; external WinhttpapiDLL name 'WinHttpTimeFromSystemTime';
-function WinHttpTimeToSystemTime; external WinhttpapiDLL name 'WinHttpTimeToSystemTime';
-function WinHttpWriteData; external WinhttpapiDLL name 'WinHttpWriteData';
+{$WARN SYMBOL_PLATFORM OFF}
+function WinHttpAddRequestHeaders; external WinHttpDLL name 'WinHttpAddRequestHeaders';
+function WinHttpCheckPlatform; external WinHttpDLL name 'WinHttpCheckPlatform';
+function WinHttpCloseHandle; external WinHttpDLL name 'WinHttpCloseHandle';
+function WinHttpConnect; external WinHttpDLL name 'WinHttpConnect';
+function WinHttpCrackUrl; external WinHttpDLL name 'WinHttpCrackUrl';
+function WinHttpCreateUrl; external WinHttpDLL name 'WinHttpCreateUrl';
+function WinHttpDetectAutoProxyConfigUrl; external WinHttpDLL name 'WinHttpDetectAutoProxyConfigUrl';
+function WinHttpGetDefaultProxyConfiguration; external WinHttpDLL name 'WinHttpGetDefaultProxyConfiguration';
+function WinHttpGetIEProxyConfigForCurrentUser; external WinHttpDLL name 'WinHttpGetIEProxyConfigForCurrentUser';
+function WinHttpGetProxyForUrl; external WinHttpDLL name 'WinHttpGetProxyForUrl';
+function WinHttpIsHostInProxyBypassList; external WinHttpDLL name 'WinHttpIsHostInProxyBypassList';
+function WinHttpOpen; external WinHttpDLL name 'WinHttpOpen';
+function WinHttpOpenRequest; external WinHttpDLL name 'WinHttpOpenRequest';
+function WinHttpQueryAuthParams; external WinHttpDLL name 'WinHttpQueryAuthParams';
+function WinHttpQueryAuthSchemes; external WinHttpDLL name 'WinHttpQueryAuthSchemes';
+function WinHttpQueryDataAvailable; external WinHttpDLL name 'WinHttpQueryDataAvailable';
+function WinHttpQueryHeaders; external WinHttpDLL name 'WinHttpQueryHeaders';
+function WinHttpQueryOption; external WinHttpDLL name 'WinHttpQueryOption';
+function WinHttpReadData; external WinHttpDLL name 'WinHttpReadData';
+function WinHttpReceiveResponse; external WinHttpDLL name 'WinHttpReceiveResponse';
+function WinHttpSendRequest; external WinHttpDLL name 'WinHttpSendRequest';
+function WinHttpSetCredentials; external WinHttpDLL name 'WinHttpSetCredentials';
+function WinHttpSetDefaultProxyConfiguration; external WinHttpDLL name 'WinHttpSetDefaultProxyConfiguration';
+function WinHttpSetOption; external WinHttpDLL name 'WinHttpSetOption';
+function WinHttpSetStatusCallback; external WinHttpDLL name 'WinHttpSetStatusCallback';
+function WinHttpSetTimeouts; external WinHttpDLL name 'WinHttpSetTimeouts';
+function WinHttpTimeFromSystemTime; external WinHttpDLL name 'WinHttpTimeFromSystemTime';
+function WinHttpTimeToSystemTime; external WinHttpDLL name 'WinHttpTimeToSystemTime';
+function WinHttpWriteData; external WinHttpDLL name 'WinHttpWriteData';
 
 end.
 

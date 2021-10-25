@@ -1,42 +1,23 @@
-﻿{***************************************************************************}
-{                                                                           }
-{           VSoft.HttpClient - A wrapper over WinHttp                       }
-{                              modelled on restSharp                        }
-{                                                                           }
-{           Copyright © 2020 Vincent Parrett and contributors               }
-{                                                                           }
-{           vincent@finalbuilder.com                                        }
-{           https://www.finalbuilder.com                                    }
-{                                                                           }
-{                                                                           }
-{***************************************************************************}
-{                                                                           }
-{  Licensed under the Apache License, Version 2.0 (the "License");          }
-{  you may not use this file except in compliance with the License.         }
-{  You may obtain a copy of the License at                                  }
-{                                                                           }
-{      http://www.apache.org/licenses/LICENSE-2.0                           }
-{                                                                           }
-{  Unless required by applicable law or agreed to in writing, software      }
-{  distributed under the License is distributed on an "AS IS" BASIS,        }
-{  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. }
-{  See the License for the specific language governing permissions and      }
-{  limitations under the License.                                           }
-{                                                                           }
-{***************************************************************************}
-
 unit VSoft.HttpClient.Request;
+
+//not used
 
 interface
 
 uses
   System.Classes,
   System.SysUtils,
-  WinApi.ActiveX,
-  VSoft.HttpClient;
+  VSoft.CancellationToken,
+  VSoft.HttpClient,
+  VSoft.WinHttp.Api;
+
 
 type
-  THttpRequest = class(TinterfacedObject, IHttpRequest)
+  IHttpRequest = interface
+
+  end;
+
+  THttpRequest = class(TinterfacedObject)
   private
     FHeaders : TStringList;
     FRequestParams : TStringList;
@@ -86,7 +67,6 @@ type
     procedure SetContentType(const value: string);
     procedure SetBody(const body : TStream; const takeOwnership : boolean ; const encoding : TEncoding = nil);overload;
     procedure SetBody(const body : string; const encoding : TEncoding = nil);overload;
-    function GetBody : IStream;
     procedure SetHeaders(const value: TStrings);
     procedure SetFiles(const value: TStrings);
     procedure SetHttpMethod(const value: THttpMethod);
@@ -122,67 +102,6 @@ type
 
 implementation
 
-uses
-  VSoft.HttpClient.MultipartFormData;
-
-//source - https://marc.durdin.net/2012/07/indy-tiduri-pathencode-urlencode-and-paramsencode-and-more/
-//this was the simplest one I could find that seems to work ok. We want to support XE2 so can't use
-//system.netencoding
-
-//lools like we might not need this as it seems like winhttp is doing the encoding for us!
-//function EncodeURIComponent(const ASrc: string): string;
-//const
-//  HexMap: UTF8String = '0123456789ABCDEF';
-//
-//  function IsSafeChar(ch: Integer): Boolean;
-//  begin
-//    if (ch >= 48) and (ch <= 57) then Result := True // 0-9
-//    else if (ch >= 65) and (ch <= 90) then Result := True // A-Z
-//    else if (ch >= 97) and (ch <= 122) then Result := True // a-z
-//    else if (ch = 33) then Result := True // !
-//    else if (ch >= 39) and (ch <= 42) then Result := True // '()*
-//    else if (ch >= 45) and (ch <= 46) then Result := True // -.
-//    else if (ch = 95) then Result := True // _
-//    else if (ch = 126) then Result := True // ~
-//    else Result := False;
-//  end;
-//var
-//  I, J: Integer;
-//  ASrcUTF8: UTF8String;
-//  encodedString : UTF8String;
-//begin
-//  Result := '';    {Do not Localize}
-//
-//  ASrcUTF8 := UTF8Encode(ASrc);
-//  // UTF8Encode call not strictly necessary but
-//  // prevents implicit conversion warning
-//
-//  I := 1; J := 1;
-//  SetLength(encodedString, Length(ASrcUTF8) * 3); // space to %xx encode every byte
-//  while I <= Length(ASrcUTF8) do
-//  begin
-//    if IsSafeChar(Ord(ASrcUTF8[I])) then
-//    begin
-//      encodedString[J] := ASrcUTF8[I];
-//      Inc(J);
-//    end
-//    else
-//    begin
-//      encodedString[J] := '%';
-//      encodedString[J+1] := HexMap[(Ord(ASrcUTF8[I]) shr 4) + 1];
-//      encodedString[J+2] := HexMap[(Ord(ASrcUTF8[I]) and 15) + 1];
-//      Inc(J,3);
-//    end;
-//    Inc(I);
-//  end;
-//
-// SetLength(encodedString, J-1);
-// result := UTF8ToString(encodedString);
-//
-//end;
-
-{ THttpRequest }
-
 function THttpRequest.AddFile(const filePath, fieldName, contentType: string): IHttpRequest;
 begin
   if fieldName <> '' then
@@ -193,13 +112,13 @@ end;
 
 function THttpRequest.AddHeader(const name, value: string): IHttpRequest;
 begin
-  result := Self;
+//  result := Self;
   FHeaders.Values[name] := value
 end;
 
 function THttpRequest.AddParameter(const name, value: string): IHttpRequest;
 begin
-  result := Self;
+  //result := Self;
   if value <> '' then
     FRequestParams.Values[name] := value
   else
@@ -208,7 +127,7 @@ end;
 
 function THttpRequest.AddUrlSegement(const name, value: string): IHttpRequest;
 begin
-  result := Self;
+//  result := Self;
   FUrlSegments.Values[name] := value
 end;
 
@@ -267,68 +186,68 @@ end;
 
 function THttpRequest.GetAuthorization: string;
 begin
-  result := FHeaders.Values[sAuthorizationHeader];
+  result := FHeaders.Values['sAuthorizationHeader'];
 end;
 
-function THttpRequest.GetBody: IStream;
-var
-  ownership : TStreamOwnership;
-  formdata : IMultipartFormDataGenerator;
-  i: Integer;
-  sBody : string;
-  ss : TStringStream;
-  sFileName :string;
-  j : integer;
-begin
-  if FContent <> nil then
-  begin
-    FContent.Seek(0, soBeginning);
-
-    if FOwnsContent then
-      ownership := soOwned
-    else
-      ownership := soReference;
-    result := TStreamAdapter.Create(FContent,ownership);
-    FOwnsContent := false;
-    FContent := nil;
-  end
-  else if (FFiles.Count > 0) or FForceFormData then
-  begin
-    formdata := TMultipartFormDataFactory.Create;
-    for i := 0 to FRequestParams.Count - 1 do
-      formdata.AddField(FRequestParams.Names[i], FRequestParams.ValueFromIndex[i] );
-
-    for i := 0 to FFiles.Count -1 do
-    begin
-      sFileName := FFiles.Names[i];
-      j := pos(',', FFiles.Names[i]);
-      if j > 0 then
-        formdata.AddFile(Copy(sFileName, 1, j-1),  Copy(sFileName, j+1, Length(sFileName)),FFiles.ValueFromIndex[i])
-      else
-        formdata.AddFile('files',  Copy(sFileName, j+1, Length(sFileName)),FFiles.ValueFromIndex[i]);
-    end;
-    //generate creates a new boundary so we need to upate the contentype before generating
-    SetContentType(formdata.ContentType);
-    result := formdata.Generate;
-  end
-  else if FRequestParams.Count > 0 then
-  begin
-    FEncoding := TEncoding.UTF8;
-    SetContentType('application/x-www-form-urlencoded');
-    for i := 0 to FRequestParams.Count - 1 do
-    begin
-      if i > 0 then
-        sBody := sBody + '&';
-      //seems like winhttp does the encoding for us??
-      sBody := sBody + FRequestParams.Names[i] + '=' + FRequestParams.ValueFromIndex[i];
-    end;
-    ss := TStringStream.Create(sBody, TEncoding.UTF8);
-    ss.Seek(0,soBeginning);
-    result := TStreamAdapter.Create(ss,soOwned);
-  end
-  else
-    result := nil;
-end;
+//function THttpRequest.GetBody: IStream;
+//var
+//  ownership : TStreamOwnership;
+//  formdata : IMultipartFormDataGenerator;
+//  i: Integer;
+//  sBody : string;
+//  ss : TStringStream;
+//  sFileName :string;
+//  j : integer;
+//begin
+//  if FContent <> nil then
+//  begin
+//    FContent.Seek(0, soBeginning);
+//
+//    if FOwnsContent then
+//      ownership := soOwned
+//    else
+//      ownership := soReference;
+//    result := TStreamAdapter.Create(FContent,ownership);
+//    FOwnsContent := false;
+//    FContent := nil;
+//  end
+//  else if (FFiles.Count > 0) or FForceFormData then
+//  begin
+//    formdata := TMultipartFormDataFactory.Create;
+//    for i := 0 to FRequestParams.Count - 1 do
+//      formdata.AddField(FRequestParams.Names[i], FRequestParams.ValueFromIndex[i] );
+//
+//    for i := 0 to FFiles.Count -1 do
+//    begin
+//      sFileName := FFiles.Names[i];
+//      j := pos(',', FFiles.Names[i]);
+//      if j > 0 then
+//        formdata.AddFile(Copy(sFileName, 1, j-1),  Copy(sFileName, j+1, Length(sFileName)),FFiles.ValueFromIndex[i])
+//      else
+//        formdata.AddFile('files',  Copy(sFileName, j+1, Length(sFileName)),FFiles.ValueFromIndex[i]);
+//    end;
+//    //generate creates a new boundary so we need to upate the contentype before generating
+//    SetContentType(formdata.ContentType);
+//    result := formdata.Generate;
+//  end
+//  else if FRequestParams.Count > 0 then
+//  begin
+//    FEncoding := TEncoding.UTF8;
+//    SetContentType('application/x-www-form-urlencoded');
+//    for i := 0 to FRequestParams.Count - 1 do
+//    begin
+//      if i > 0 then
+//        sBody := sBody + '&';
+//      //seems like winhttp does the encoding for us??
+//      sBody := sBody + FRequestParams.Names[i] + '=' + FRequestParams.ValueFromIndex[i];
+//    end;
+//    ss := TStringStream.Create(sBody, TEncoding.UTF8);
+//    ss.Seek(0,soBeginning);
+//    result := TStreamAdapter.Create(ss,soOwned);
+//  end
+//  else
+//    result := nil;
+//end;
 
 function THttpRequest.GetBodyAsString: string;
 begin
@@ -358,7 +277,7 @@ end;
 
 function THttpRequest.GetContentType: string;
 begin
-  result := FHeaders.Values[cContentTypeHeader];
+  result := FHeaders.Values['Content-Type'];
 end;
 
 function THttpRequest.GetFiles: TStrings;
@@ -490,7 +409,7 @@ end;
 
 procedure THttpRequest.SetAuthorization(const value: string);
 begin
-  FHeaders.Values[sAuthorizationHeader] := value;
+  FHeaders.Values[cAuthorizationHeader] := value;
 end;
 
 procedure THttpRequest.SetBody(const body: string; const encoding: TEncoding);
@@ -601,5 +520,6 @@ procedure THttpRequest.SetUserAgent(const value: string);
 begin
   FHeaders.Values[cUserAgentHeader] := value;
 end;
+
 
 end.
