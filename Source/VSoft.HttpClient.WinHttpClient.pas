@@ -32,6 +32,7 @@ type
     FReceiveBuffer : TBytes;
     FLastReceiveBlockSize : DWORD;
     FBytesWritten : DWORD;
+    FContentLength : integer;
   protected
     procedure HTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
 
@@ -79,7 +80,8 @@ uses
   System.Math,
   System.StrUtils;
 
-const cReceiveBufferSize : DWORD = 8 * 1024;
+//TODO : What is the optimum buffer size?
+const cReceiveBufferSize : DWORD = 32 * 1024;
 
 type
   TRequestCracker = class(TRequest);
@@ -140,16 +142,17 @@ end;
 
 destructor THttpClient.Destroy;
 var
-  request: TRequest;
+  i : integer;
 begin
   FWaitEvent.SetEvent;
   FWaitEvent.Free;
 
   if FSession <> nil then
     WinHttpCloseHandle(FSession);
-  for request in FRequests do
+  if FRequests.Count > 0 then
   begin
-    request.Free;
+    for i := FRequests.Count -1 downto 0 do
+      FRequests[i].Free;
   end;
   FRequests.Free;
   inherited;
@@ -211,6 +214,7 @@ begin
       dataSize := PDWORD(lpvStatusInformation)^;
       if dataSize = 0 then //all data read
       begin
+        FResponse.FinalizeContent;
         //cleanup
         FWaitEvent.SetEvent; //unblock
       end
@@ -221,22 +225,24 @@ begin
           //cleanup
           FWaitEvent.SetEvent; //unblock
         end;
+
       end;
     end;
 
     WINHTTP_CALLBACK_STATUS_READ_COMPLETE :
     begin
+      FLastReceiveBlockSize := dwStatusInformationLength;
       //if we didn't receive any more data then we are done.
       if FLastReceiveBlockSize = 0 then
       begin
-
+        FResponse.FinalizeContent;
         FWaitEvent.SetEvent;
         exit;
       end
       else
       begin
-        //TODO : Copy to response.
-
+        Inc(FContentLength, FLastReceiveBlockSize);
+        FResponse.WriteBuffer(FReceiveBuffer, FLastReceiveBlockSize);
       end;
 
       //this will cause a data available callback
@@ -310,8 +316,13 @@ begin
 end;
 
 function THttpClient.ReadData(hRequest: HINTERNET; dataSize : DWORD): boolean;
+var
+  bufferSize : DWORD;
 begin
-  result := WinHttpReadData(hRequest, FReceiveBuffer[0], cReceiveBufferSize -1 , @FLastReceiveBlockSize);
+  bufferSize := Min(dataSize + 2, cReceiveBufferSize);
+  ZeroMemory(@FReceiveBuffer[0], bufferSize);
+//  FLastReceiveBlockSize := 0;
+  result := WinHttpReadData(hRequest, FReceiveBuffer[0], bufferSize , @FLastReceiveBlockSize);
 end;
 
 function THttpClient.ReadHeaders(hRequest: HINTERNET) : boolean;
@@ -395,7 +406,7 @@ begin
     FCurrentRequest := request;
     EnsureSession;
     SetLength(FReceiveBuffer, cReceiveBufferSize);
-
+    FContentLength := 0;
 
     ZeroMemory(@urlComp, SizeOf(urlComp));
     urlComp.dwStructSize := SizeOf(urlComp);
@@ -465,12 +476,12 @@ begin
         dataLength := 0;
       end;
 
+      FResponse := THttpResponse.Create(0,'','',request.SaveAsFile); //for now
+
       bResult := WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0, data, dataLength, dataLength, NativeUInt(Pointer(Self)) );
 
       if not bResult then
         exit;
-
-      FResponse := THttpResponse.Create(0,'','',''); //for now
 
       waitRes := WaitForMultipleObjects(handleCount ,@waitHandles[0],false, INFINITE); //todo - add timeouts!
       case waitRes of

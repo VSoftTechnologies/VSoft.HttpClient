@@ -69,7 +69,7 @@ type
 
   TRequest = class
   private
-    FClient : IHttpClientInternal;
+    FClient : TObject;
     FHttpMethod : THttpMethod;
     FHeaders : TStringList;
     FRequestParams : TStringList;
@@ -105,8 +105,10 @@ type
     function GetContentLength : Int64;
     function GetCharSet : string;
 
+    function Client : IHttpClientInternal;
+
   public
-    constructor Create(const client : IHttpClientInternal; const resource : string);
+    constructor Create(const client : TObject; const resource : string);
     destructor Destroy; override;
 
 
@@ -179,6 +181,7 @@ type
     property HtttpMethod : THttpMethod read FHttpMethod;
     property Resource    : string read FResource write FResource;
     property ContentLength : Int64 read GetContentLength;
+    property SaveAsFile  : string read FSaveAsFile write FSaveAsFile;
   end;
 
 
@@ -233,7 +236,12 @@ uses
 
 { TRequest }
 
-constructor TRequest.Create(const client: IHttpClientInternal;  const resource: string);
+function TRequest.Client: IHttpClientInternal;
+begin
+  FClient.GetInterface(IHttpClientInternal, result)
+end;
+
+constructor TRequest.Create(const client: TObject;  const resource: string);
 begin
   FClient := client;
   FResource := resource;
@@ -247,7 +255,7 @@ end;
 function TRequest.Delete(const cancellationToken: ICancellationToken): IHttpResponse;
 begin
   FHttpMethod := THttpMethod.DELETE;
-  result := FClient.Send(self, cancellationToken);
+  result := Client.Send(self, cancellationToken);
 end;
 
 function TRequest.Delete<T>(const entity : T; const cancellationToken: ICancellationToken): IHttpResponse;
@@ -258,12 +266,12 @@ begin
   entityType := TypeInfo(T);
   //TODO : Serialize entity
 
-  result := FClient.Send(self,cancellationToken);
+  result := Client.Send(self,cancellationToken);
 end;
 
 destructor TRequest.Destroy;
 begin
-  FClient.ReleaseRequest(self);
+  Client.ReleaseRequest(self);
   FClient := nil;
   FFiles.Free;
   FHeaders.Free;
@@ -281,7 +289,7 @@ end;
 function TRequest.Get(const cancellationToken: ICancellationToken): IHttpResponse;
 begin
   FHttpMethod := THttpMethod.GET;
-  result := FClient.Send(Self, cancellationToken);
+  result := Client.Send(Self, cancellationToken);
 end;
 
 function TRequest.Get<T>(const cancellationToken: ICancellationToken): T;
@@ -291,7 +299,7 @@ var
 begin
   FHttpMethod := THttpMethod.GET;
   returnType := TypeInfo(T);
-  response := FClient.Send(self, cancellationToken);
+  response := Client.Send(self, cancellationToken);
   //TODO : deserialized the response
   result := nil
 end;
@@ -417,7 +425,7 @@ end;
 function TRequest.Patch(const cancellationToken: ICancellationToken): IHttpResponse;
 begin
   FHttpMethod := THttpMethod.PATCH;
-  result := FClient.Send(self, cancellationToken);
+  result := Client.Send(self, cancellationToken);
 end;
 
 function TRequest.Patch<T, R>(const entity : T; const cancellationToken: ICancellationToken): R;
@@ -429,7 +437,7 @@ begin
   FHttpMethod := THttpMethod.PATCH;
   entityType := TypeInfo(T);
   returnType := TypeInfo(R);
-  response := FClient.Send(Self, cancellationToken);
+  response := Client.Send(Self, cancellationToken);
 
   result := nil;
 end;
@@ -441,7 +449,7 @@ var
 begin
   FHttpMethod := THttpMethod.PATCH;
   entityType := TypeInfo(T);
-  response := FClient.Send(self, cancellationToken);
+  response := Client.Send(self, cancellationToken);
 
   result := nil;
 end;
@@ -449,7 +457,7 @@ end;
 function TRequest.Post(const cancellationToken: ICancellationToken): IHttpResponse;
 begin
   FHttpMethod := THttpMethod.POST;
-  result := FClient.Send(self, cancellationToken);
+  result := Client.Send(self, cancellationToken);
 end;
 
 function TRequest.Post<T, R>(const entity : T; const cancellationToken: ICancellationToken): R;
@@ -461,7 +469,7 @@ begin
   FHttpMethod := THttpMethod.POST;
   entityType := TypeInfo(T);
   returnType := TypeInfo(R);
-  response := FClient.Send(Self, cancellationToken );
+  response := Client.Send(Self, cancellationToken );
 
   result := nil;
 end;
@@ -475,13 +483,13 @@ begin
 
   //TODO : serialize entity
 
-  result := FClient.Send(self, cancellationToken);
+  result := Client.Send(self, cancellationToken);
 end;
 
 function TRequest.Put(const cancellationToken: ICancellationToken): IHttpResponse;
 begin
   FHttpMethod := THttpMethod.PUT;
-  result := FClient.Send(self, cancellationToken);
+  result := Client.Send(self, cancellationToken);
 end;
 
 function TRequest.Put<T, R>(const entity: T; const cancellationToken: ICancellationToken): R;
@@ -494,7 +502,7 @@ begin
   entityType := TypeInfo(T);
   returnType := TypeInfo(R);
 
-  response := FClient.Send(Self, cancellationToken );
+  response := Client.Send(Self, cancellationToken );
 
   result := nil;
 
@@ -509,7 +517,7 @@ begin
 
   //TODO : Serialize!
 
-  result := FClient.Send(self, cancellationToken);
+  result := Client.Send(self, cancellationToken);
 end;
 
 procedure TRequest.SetAccept(const value: string);

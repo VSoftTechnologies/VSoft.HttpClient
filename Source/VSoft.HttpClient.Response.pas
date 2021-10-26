@@ -30,6 +30,7 @@ unit VSoft.HttpClient.Response;
 interface
 
 uses
+  System.SysUtils,
   System.Classes,
   VSoft.HttpClient;
 
@@ -39,6 +40,8 @@ type
     procedure SetContent(const stream : TStream);
     procedure SetHeaders(const rawHeaders : string);
     procedure SetStatusCode(const value : integer);
+    procedure WriteBuffer(const buffer : TBytes; const length : NativeInt);
+    procedure FinalizeContent; //closes filestream;
   end;
 
   THttpResponse = class(TInterfacedObject, IHttpResponse, IHttpResponseInternal)
@@ -70,6 +73,8 @@ type
     procedure SetHeaders(const rawHeaders : string);
     procedure SetContent(const stream: TStream);
     procedure SetStatusCode(const value : integer);
+    procedure WriteBuffer(const buffer : TBytes; const length : NativeInt);
+    procedure FinalizeContent; //closes filestream;
 
   public
     constructor Create(const httpResult : integer; const errorMsg : string; const headers : string; const fileName : string);
@@ -81,7 +86,6 @@ implementation
 
 uses
   System.IOUtils,
-  System.SysUtils,
   VSoft.HttpClient.Headers;
 
 { THttpResponse }
@@ -122,6 +126,12 @@ destructor THttpResponse.Destroy;
 begin
   FStream.Free;
   inherited;
+end;
+
+procedure THttpResponse.FinalizeContent;
+begin
+  if FStream is TFileStream then
+    FreeAndNil(FStream);
 end;
 
 function THttpResponse.GetContentDisposition: IContentDisposition;
@@ -301,6 +311,13 @@ end;
 procedure THttpResponse.SetStatusCode(const value: integer);
 begin
   FHttpResult := value;
+end;
+
+procedure THttpResponse.WriteBuffer(const buffer: TBytes; const length : NativeInt);
+begin
+  if FStream = nil then
+    exit;
+  FStream.WriteData(buffer, length);
 end;
 
 end.
