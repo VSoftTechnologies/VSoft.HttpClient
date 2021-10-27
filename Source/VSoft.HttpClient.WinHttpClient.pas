@@ -418,7 +418,10 @@ begin
     urlComp.dwExtraInfoLength := DWORD(-1);
 
     if not WinHttpCrackUrl(PWideChar(FBaseUri), 0, 0, urlComp ) then
-        RaiseLastOSError;
+    begin
+      FClientError := GetLastError;
+      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+    end;
 
     SetString(host, urlComp.lpszHostName, urlComp.dwHostNameLength);
 
@@ -429,7 +432,10 @@ begin
     option := WINHTTP_PROTOCOL_FLAG_HTTP2;
 
     if not WinHttpSetOption(hConnection,WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, @option, SizeOf(DWORD)) then
-        RaiseLastOSError;
+    begin
+      FClientError := GetLastError;
+      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+    end;
 
     dwOpenRequestFlags := WINHTTP_FLAG_REFRESH;
     if urlComp.nScheme = INTERNET_SCHEME_HTTPS then
@@ -439,7 +445,10 @@ begin
 
     hRequest := WinHttpOpenRequest(hConnection, PWideChar(method), PWideChar(request.Resource), PWideChar(http_version),WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES , dwOpenRequestFlags);
     if hRequest = nil then
-        RaiseLastOSError;
+    begin
+      FClientError := GetLastError;
+      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+    end;
     try
 
       pCallback := WinHttpSetStatusCallback(hRequest, _HTTPCallback, WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS + WINHTTP_CALLBACK_FLAG_REDIRECT, 0);

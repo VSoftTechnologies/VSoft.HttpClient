@@ -28,7 +28,7 @@ type
     function GetContentType : string;
     function GetResponseStream : TStream;
     function GetResponse : string;
-    function GetHttpResponseCode : integer;
+    function GetStatusCode : integer;
     function GetHeaders : TStrings;
     function GetIsStringResponse : boolean;
     function GetFileName : string;
@@ -45,7 +45,7 @@ type
 
     property ResponseStream : TStream read GetResponseStream;
     property Response : string read GetResponse;
-    property ResponseCode : integer read GetHttpResponseCode;
+    property StatusCode : integer read GetStatusCode;
     property Headers : TStrings read GetHeaders;
     //returns true if the contenttype indicates a textual response.
     property IsStringResponse : boolean read GetIsStringResponse;

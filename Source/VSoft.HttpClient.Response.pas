@@ -48,7 +48,7 @@ type
   private
     FHeaders : TStringList;
     FStream : TStream;
-    FHttpResult : integer;
+    FStatusCode : integer;
     FFileName : string;
     FErrorMessage : string;
     FContentDisposition : IContentDisposition;
@@ -57,7 +57,7 @@ type
 
     function GetContentType: string;
     function GetHeaders: TStrings;
-    function GetHttpResponseCode: Integer;
+    function GetStatusCode: Integer;
     function GetIsStringResponse: Boolean;
     function GetResponse: string;
     function GetResponseStream: TStream;
@@ -95,7 +95,7 @@ constructor THttpResponse.Create(const httpResult: integer; const errorMsg : str
 var
   i: Integer;
 begin
-  FHttpResult := httpResult;
+  FStatusCode := httpResult;
   FErrorMessage := errorMsg;
   if not IsSuccess and (FErrorMessage = '') then
     FErrorMessage := HttpResultString;
@@ -165,9 +165,9 @@ begin
   result := FHeaders;
 end;
 
-function THttpResponse.GetHttpResponseCode: Integer;
+function THttpResponse.GetStatusCode: Integer;
 begin
-  result := FHttpResult;
+  result := FStatusCode;
 end;
 
 function THttpResponse.GetIsStringResponse: Boolean;
@@ -203,7 +203,7 @@ end;
 
 function THttpResponse.HttpResultString: string;
 begin
-  case FHttpResult of
+  case FStatusCode of
     100 : result := 'Continue';
     101 : result := 'Switching Protocols';
     200 : result := 'OK';
@@ -264,7 +264,7 @@ end;
 
 function THttpResponse.IsSuccess: boolean;
 begin
-  result := FHttpResult = 200;
+  result := FStatusCode = 200;
 end;
 
 procedure THttpResponse.SaveTo(const folderName, fileName: string);
@@ -353,7 +353,7 @@ end;
 
 procedure THttpResponse.SetStatusCode(const value: integer);
 begin
-  FHttpResult := value;
+  FStatusCode := value;
 end;
 
 procedure THttpResponse.WriteBuffer(const buffer: TBytes; const length : NativeInt);
