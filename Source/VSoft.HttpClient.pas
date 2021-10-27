@@ -213,6 +213,19 @@ type
    class function CreateClient(const baseUri: string = ''): IHttpClient;
   end;
 
+  EHttpClientException = class(Exception)
+  private
+    FError : NativeUInt;
+  public
+    constructor Create(const message : string; const errorCode : NativeUInt);reintroduce;
+    property ErrorCode : NativeUInt read FError;
+  end;
+
+
+  function HttpMethodToString(const value : THttpMethod) : string;
+
+  function ClientErrorToString(const value : NativeUInt) : string;
+
 const
   cAcceptHeader = 'Accept';
   cAcceptCharsetHeader = 'Accept-Charset';
@@ -230,9 +243,96 @@ const
 implementation
 
 uses
+  VSoft.WinHttp.Api,
   VSoft.HttpClient.WinHttpClient,
 //  VSoft.HttpClient.Request,
   VSoft.HttpClient.MultipartFormData;
+
+function ClientErrorToString(const value : NativeUInt) : string;
+begin
+  case value of
+    ERROR_WINHTTP_OUT_OF_HANDLES : result := 'Out of handles.';
+    ERROR_WINHTTP_TIMEOUT : result := 'Timeout.';
+    ERROR_WINHTTP_INTERNAL_ERROR : result := 'Internal error.';
+    ERROR_WINHTTP_INVALID_URL : result := 'Invalid url.';
+    ERROR_WINHTTP_UNRECOGNIZED_SCHEME : result := 'Unrecognized scheme.';
+    ERROR_WINHTTP_NAME_NOT_RESOLVED : result := 'Name not resolved.';
+    ERROR_WINHTTP_INVALID_OPTION : result := 'Invalid option.';
+    ERROR_WINHTTP_OPTION_NOT_SETTABLE : result := 'Option not settable.';
+    ERROR_WINHTTP_SHUTDOWN : result := 'Shutdown.';
+
+
+    ERROR_WINHTTP_LOGIN_FAILURE : result := 'Login failure.';
+    ERROR_WINHTTP_OPERATION_CANCELLED : result := 'Operation cancelled.';
+    ERROR_WINHTTP_INCORRECT_HANDLE_TYPE : result := 'Incorrect handle type.';
+    ERROR_WINHTTP_INCORRECT_HANDLE_STATE : result := 'Incorrect handle state.';
+    ERROR_WINHTTP_CANNOT_CONNECT : result := 'Cannot connect.';
+    ERROR_WINHTTP_CONNECTION_ERROR : result := 'Connection error.';
+    ERROR_WINHTTP_RESEND_REQUEST : result := 'Resend Request.';
+
+    ERROR_WINHTTP_CLIENT_AUTH_CERT_NEEDED : result := 'The server requires SSL client Authentication.';
+
+
+  // WinHttpRequest Component errors
+
+    ERROR_WINHTTP_CANNOT_CALL_BEFORE_OPEN : result := 'Cannot call before open.';
+    ERROR_WINHTTP_CANNOT_CALL_BEFORE_SEND : result := 'Cannot call before send.';
+    ERROR_WINHTTP_CANNOT_CALL_AFTER_SEND : result := 'Cannot call after send.';
+    ERROR_WINHTTP_CANNOT_CALL_AFTER_OPEN : result := 'Cannot call after open.';
+
+  // HTTP API errors
+    ERROR_WINHTTP_HEADER_NOT_FOUND : result := 'Header not found.';
+    ERROR_WINHTTP_INVALID_SERVER_RESPONSE : result := 'Invalid server response.';
+    ERROR_WINHTTP_INVALID_HEADER : result := 'Invalid header';
+    ERROR_WINHTTP_INVALID_QUERY_REQUEST : result := 'Invalid query request.';
+    ERROR_WINHTTP_HEADER_ALREADY_EXISTS : result := 'Header already exists';
+    ERROR_WINHTTP_REDIRECT_FAILED : result := 'Redirect failed.';
+
+  // additional WinHttp API error codes
+
+    ERROR_WINHTTP_AUTO_PROXY_SERVICE_ERROR : result := 'A proxy for the specified URL cannot be located.';
+    ERROR_WINHTTP_BAD_AUTO_PROXY_SCRIPT : result := 'An error occurred executing the script code in the Proxy Auto-Configuration (PAC) file.';
+    ERROR_WINHTTP_UNABLE_TO_DOWNLOAD_SCRIPT : result := 'The PAC file cannot be downloaded.';
+
+    ERROR_WINHTTP_NOT_INITIALIZED : result := 'Not Initialized.';
+    ERROR_WINHTTP_SECURE_FAILURE : result := 'One or more errors were found in the Secure Sockets Layer (SSL) certificate sent by the server.';
+
+  // Certificate security errors. These are raised only by the WinHttpRequest
+  // component. The WinHTTP Win32 API will return ERROR_WINHTTP_SECURE_FAILE and
+  // provide additional information via the WINHTTP_CALLBACK_STATUS_SECURE_FAILURE
+  // callback notification.
+
+    ERROR_WINHTTP_SECURE_CERT_DATE_INVALID : result := 'A required certificate is not within its validity period.';
+    ERROR_WINHTTP_SECURE_CERT_CN_INVALID : result := 'A certificate CN name does not match the passed value.';
+    ERROR_WINHTTP_SECURE_INVALID_CA : result := 'A certificate chain was processed, but terminated in a root certificate that is not trusted by the trust provider.';
+    ERROR_WINHTTP_SECURE_CERT_REV_FAILED : result := 'Certificate revocation cannot be checked because the revocation server was offline.';
+    ERROR_WINHTTP_SECURE_CHANNEL_ERROR : result := 'An error occurred with a secure channel.';
+    ERROR_WINHTTP_SECURE_INVALID_CERT : result := 'Invalid certificate.';
+    ERROR_WINHTTP_SECURE_CERT_REVOKED : result := 'A certificate has been revoked';
+    ERROR_WINHTTP_SECURE_CERT_WRONG_USAGE : result := 'A certificate is not valid for the requested usage';
+
+
+    ERROR_WINHTTP_AUTODETECTION_FAILED : result := 'a proxy for the specified URL cannot be located.';
+    ERROR_WINHTTP_HEADER_COUNT_EXCEEDED : result := 'A larger number of headers were present in a response than WinHTTP could receive.';
+    ERROR_WINHTTP_HEADER_SIZE_OVERFLOW : result := 'The size of headers received exceeds the limit for the request handle';
+    ERROR_WINHTTP_CHUNKED_ENCODING_HEADER_SIZE_OVERFLOW : result := 'An overflow condition is encountered in the course of parsing chunked encoding.';
+    ERROR_WINHTTP_RESPONSE_DRAIN_OVERFLOW : result := 'An incoming response exceeds an internal WinHTTP size limit.';
+    ERROR_WINHTTP_CLIENT_CERT_NO_PRIVATE_KEY : result := 'The context for the SSL client certificate does not have a private key associated with it. The client certificate may have been imported to the computer without the private key.';
+    ERROR_WINHTTP_CLIENT_CERT_NO_ACCESS_PRIVATE_KEY : result := 'The application does not have the required privileges to access the private key associated with the client certificate.';
+  else
+    result := 'Unknown Error';
+  end;
+
+
+end;
+
+
+
+function HttpMethodToString(const value : THttpMethod) : string;
+begin
+  result := GetEnumName(TypeInfo(THttpMethod), Ord(value));
+end;
+
 
 { TRequest }
 
@@ -667,6 +767,14 @@ end;
 class function THttpClientFactory.CreateClient( const baseUri: string): IHttpClient;
 begin
   result := THttpClient.Create(baseUri);
+end;
+
+{ EHttpClientException }
+
+constructor EHttpClientException.Create(const message: string; const errorCode: NativeUInt);
+begin
+  inherited Create(message);
+  FError := errorCode;
 end;
 
 end.

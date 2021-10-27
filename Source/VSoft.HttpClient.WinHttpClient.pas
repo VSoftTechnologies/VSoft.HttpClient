@@ -19,7 +19,6 @@ type
   THttpClient = class(TInterfacedObject, IHttpClient, IHttpClientInternal)
   private
     FSession : HINTERNET;
-    //FConnection : HINTERNET;
     FBaseUri : string;
     FUserAgent : string;
     FRequests : TList<TRequest>;
@@ -32,7 +31,7 @@ type
     FReceiveBuffer : TBytes;
     FLastReceiveBlockSize : DWORD;
     FBytesWritten : DWORD;
-    FContentLength : integer;
+    FClientError : DWORD;
   protected
     procedure HTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
 
@@ -151,6 +150,7 @@ begin
     WinHttpCloseHandle(FSession);
   if FRequests.Count > 0 then
   begin
+    //reverse order as they remove themselves from the list.
     for i := FRequests.Count -1 downto 0 do
       FRequests[i].Free;
   end;
@@ -198,6 +198,12 @@ var
 begin
   case dwInternetStatus of
 
+    WINHTTP_CALLBACK_STATUS_REQUEST_ERROR :
+    begin
+       FClientError := PWinHttpAsyncResult(lpvStatusInformation)^.dwError;
+       FWaitEvent.SetEvent;
+    end;
+
     WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE :
     begin
       ReadHeaders(hInternet);
@@ -241,7 +247,6 @@ begin
       end
       else
       begin
-        Inc(FContentLength, FLastReceiveBlockSize);
         FResponse.WriteBuffer(FReceiveBuffer, FLastReceiveBlockSize);
       end;
 
@@ -369,12 +374,6 @@ const http_version = 'HTTP/2';
 
 const WAIT_OBJECT_1 = WAIT_OBJECT_0 + 1;
 
-function HttpMethodToString(const value : THttpMethod) : string;
-begin
-  result := GetEnumName(TypeInfo(THttpMethod), Ord(value));
-end;
-
-
 //simple get/post etc.
 function THttpClient.Send(const request: TRequest; const cancellationToken: ICancellationToken): IHttpResponse;
 var
@@ -403,10 +402,12 @@ begin
     raise Exception.Create('A request is in progress.. winhttp is not reentrant!');
   try
     result := nil;
+    FClientError := 0;
+    FLastReceiveBlockSize := 0;
+    FBytesWritten := 0;
     FCurrentRequest := request;
     EnsureSession;
     SetLength(FReceiveBuffer, cReceiveBufferSize);
-    FContentLength := 0;
 
     ZeroMemory(@urlComp, SizeOf(urlComp));
     urlComp.dwStructSize := SizeOf(urlComp);
@@ -489,18 +490,27 @@ begin
         begin
           //wait object triggered - need to check if an error occured
           //if all is ok, then return the response.
+          if FClientError <> 0 then
+          begin
+            raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+            //raise exception?
+          end;
+
           result := FResponse;
           FResponse := nil;
         end;
         WAIT_OBJECT_1 :
         begin
           //cancellation token triggered
+            raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+
           FResponse := nil;
           exit;
         end;
         WAIT_TIMEOUT :
         begin
           //timed out, clean up and return.
+          raise EHttpClientException.Create(ClientErrorToString(ERROR_WINHTTP_TIMEOUT), ERROR_WINHTTP_TIMEOUT);
           FResponse := nil;
           exit;
         end;

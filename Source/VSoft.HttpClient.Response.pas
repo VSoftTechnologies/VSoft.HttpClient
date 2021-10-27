@@ -86,6 +86,7 @@ implementation
 
 uses
   System.IOUtils,
+  System.StrUtils,
   VSoft.HttpClient.Headers;
 
 { THttpResponse }
@@ -108,11 +109,6 @@ begin
   end;
 
   FContentDisposition := nil;
-
-  if FHeaders.IndexOfName('Content-Disposition') <> -1 then
-  begin
-    FContentDisposition := TContentDisposition.Create(FHeaders.Values['Content-Disposition']);
-  end;
 
   FFileName := fileName;
   //TODO : if contentdisposition says it's a file, create a temp filestream.
@@ -159,7 +155,9 @@ begin
   if FFileName <> '' then
     result :=  FFileName
   else if FContentDisposition <> nil then
-    FFileName := FContentDisposition.FileName;
+    FFileName := FContentDisposition.FileName
+  else
+    result := '';
 end;
 
 function THttpResponse.GetHeaders: TStrings;
@@ -304,7 +302,52 @@ begin
 end;
 
 procedure THttpResponse.SetHeaders(const rawHeaders: string);
+var
+  sList : TStringList;
+  i : integer;
+  j : integer;
+  sName : string;
+  sValue : string;
+  sLine : string;
+
+  function CheckForMethodHeader(const s : string) : boolean;
+  var
+    meth : THttpMethod;
+  begin
+    for meth := Low(THttpMethod) to High(THttpMethod) do
+    begin
+      if StartsText(HttpMethodToString(meth), s) then
+        exit(true);
+    end;
+    result := false;
+  end;
+
 begin
+  sList := TStringList.Create;
+  try
+    sList.Text := rawHeaders;
+
+    for i := 0 to sList.Count -1 do
+    begin
+      sLine := sList.Strings[i];
+      if CheckForMethodHeader(sLine) then
+        continue;
+      j := Pos(':', sLine);
+      if j > 0 then
+      begin
+        sName := Trim(Copy(sLine,1,j-1));
+        sValue := Trim(Copy(sLine, j+1, Length(sLine)));
+        FHeaders.Add(sName + '=' + sValue);
+      end;
+    end;
+
+  finally
+    sList.Free;
+  end;
+
+  if FHeaders.IndexOfName('Content-Disposition') <> -1 then
+    FContentDisposition := TContentDisposition.Create(FHeaders.Values['Content-Disposition']);
+
 
 end;
 
