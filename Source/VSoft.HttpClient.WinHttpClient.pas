@@ -32,10 +32,11 @@ type
     FLastReceiveBlockSize : DWORD;
     FBytesWritten : DWORD;
     FClientError : DWORD;
+    FUseHttp2 : boolean;
   protected
     procedure HTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
 
-    function ReadHeaders(hRequest : HINTERNET) : boolean;
+    procedure ReadHeaders(hRequest : HINTERNET);
     function ReadData(hRequest : HINTERNET; dataSize : DWORD) : boolean;
 
     function WriteData(hRequest : HINTERNET; position : DWORD) : boolean;
@@ -60,7 +61,15 @@ type
     procedure SetUserName(const value : string);
     procedure SetPassword(const value : string);
 
+    function GetUseHttp2 : boolean;
+    procedure SetUseHttp2(const value : boolean);
+
+
     function CreateRequest(const resource : string) : TRequest;
+
+    procedure UseSerializer(const useFunc : TUseSerializerFunc);overload;
+    procedure UseSerializer(const serializer : IRestSerializer);overload;
+
 
     //IHttpClientInternal
     function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
@@ -182,6 +191,11 @@ begin
   result := FPassword;
 end;
 
+function THttpClient.GetUseHttp2: boolean;
+begin
+  result := FUseHttp2;
+end;
+
 function THttpClient.GetUserAgent: string;
 begin
   result := FUserAgent;
@@ -210,7 +224,7 @@ begin
       //this will cause a data available callback
       if not WinHttpQueryDataAvailable(hInternet, nil) then
       begin
-        //cleanup.
+        FClientError := GetLastError;
         FWaitEvent.SetEvent; //unblock
       end
     end;
@@ -221,14 +235,13 @@ begin
       if dataSize = 0 then //all data read
       begin
         FResponse.FinalizeContent;
-        //cleanup
         FWaitEvent.SetEvent; //unblock
       end
       else
       begin
         if not ReadData(hInternet, dataSize) then
         begin
-          //cleanup
+          FClientError := GetLastError;
           FWaitEvent.SetEvent; //unblock
         end;
 
@@ -253,6 +266,7 @@ begin
       //this will cause a data available callback
       if not WinHttpQueryDataAvailable(hInternet, nil) then
       begin
+        FClientError := GetLastError;
         //cleanup.
         FWaitEvent.SetEvent; //unblock
       end
@@ -266,13 +280,14 @@ begin
         begin
           if not WriteData(hInternet, 0) then
           begin
-
+            FClientError := GetLastError;
             FWaitEvent.SetEvent;
           end;
         end;
 
       if (WinHttpReceiveResponse( hInternet, nil) = false) then
       begin
+        FClientError := GetLastError;
         //handle error?
         //cleanup.
         FWaitEvent.SetEvent; //unblock
@@ -289,27 +304,22 @@ begin
       begin
         if not WriteData(hInternet, FBytesWritten) then
         begin
+           FClientError := GetLastError;
            FWaitEvent.SetEvent; //unblock
            exit;
         end;
       end;
 
-      if (WinHttpReceiveResponse( hInternet, nil) = false) then
+      if not WinHttpReceiveResponse( hInternet, nil) then
       begin
-        //handle error?
-        //cleanup.
+        FClientError := GetLastError;
         FWaitEvent.SetEvent; //unblock
       end;
-
-      //done
-//      FWaitEvent.SetEvent; //unblock
-
-
-
     end;
 
     WINHTTP_CALLBACK_STATUS_RESPONSE_RECEIVED :
     begin
+      //all done.
       FWaitEvent.SetEvent; //unblock
     end;
 
@@ -326,11 +336,10 @@ var
 begin
   bufferSize := Min(dataSize + 2, cReceiveBufferSize);
   ZeroMemory(@FReceiveBuffer[0], bufferSize);
-//  FLastReceiveBlockSize := 0;
   result := WinHttpReadData(hRequest, FReceiveBuffer[0], bufferSize , @FLastReceiveBlockSize);
 end;
 
-function THttpClient.ReadHeaders(hRequest: HINTERNET) : boolean;
+procedure THttpClient.ReadHeaders(hRequest: HINTERNET);
 var
   bufferSize : DWORD;
   headers : string;
@@ -338,30 +347,28 @@ var
   statusCodeSize : DWORD;
 
 begin
-  result := false;
   statusCodeSize := Sizeof(DWORD);
 
   if WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE + WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,　@statusCode, statusCodeSize, WINHTTP_NO_HEADER_INDEX) then
     FResponse.SetStatusCode(statusCode);
 
-  if (not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, nil, bufferSize, WINHTTP_NO_HEADER_INDEX)) then
+  if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, nil, bufferSize, WINHTTP_NO_HEADER_INDEX) then
   begin
     if GetLastError <> ERROR_INSUFFICIENT_BUFFER then
     begin
-      //how do we handle the error
-      exit;
+      FClientError := GetLastError;
+      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
     end;
   end;
 
   SetLength(headers, bufferSize div SizeOf(Char) - 1);
 
-  if(WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, PChar(headers), bufferSize, WINHTTP_NO_HEADER_INDEX)) then
+  if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, PChar(headers), bufferSize, WINHTTP_NO_HEADER_INDEX) then
   begin
-    FResponse.SetHeaders(headers);
-    result := true;
+    FClientError := GetLastError;
+    raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
   end;
-
-
+  FResponse.SetHeaders(headers)
 end;
 
 procedure THttpClient.ReleaseRequest(const request: TRequest);
@@ -373,6 +380,9 @@ end;
 const http_version = 'HTTP/2';
 
 const WAIT_OBJECT_1 = WAIT_OBJECT_0 + 1;
+
+const tlsProtocols : DWORD =  WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 + WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
+
 
 //simple get/post etc.
 function THttpClient.Send(const request: TRequest; const cancellationToken: ICancellationToken): IHttpResponse;
@@ -407,6 +417,14 @@ begin
     FBytesWritten := 0;
     FCurrentRequest := request;
     EnsureSession;
+
+    if not WinHttpSetOption(FSession, WINHTTP_OPTION_SECURE_PROTOCOLS, @tlsProtocols, sizeof(tlsProtocols)) then
+    begin
+      FClientError := GetLastError;
+      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+    end;
+
+
     SetLength(FReceiveBuffer, cReceiveBufferSize);
 
     ZeroMemory(@urlComp, SizeOf(urlComp));
@@ -427,9 +445,14 @@ begin
 
     hConnection := WinHttpConnect(FSession, PWideChar(host), urlComp.nPort, 0);
     if hConnection = nil then
-        RaiseLastOSError;
+    begin
+      FClientError := GetLastError;
+      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+    end;
 
-    option := WINHTTP_PROTOCOL_FLAG_HTTP2;
+    option := 0;
+    if FUseHttp2 then
+      option := WINHTTP_PROTOCOL_FLAG_HTTP2;
 
     if not WinHttpSetOption(hConnection,WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, @option, SizeOf(DWORD)) then
     begin
@@ -550,6 +573,11 @@ begin
   FPassword := value;
 end;
 
+procedure THttpClient.SetUseHttp2(const value: boolean);
+begin
+  FUseHttp2 := value;
+end;
+
 procedure THttpClient.SetUserAgent(const value: string);
 begin
   FUserAgent := value;
@@ -560,6 +588,16 @@ begin
   FUserName := value;
 end;
 
+
+procedure THttpClient.UseSerializer(const serializer: IRestSerializer);
+begin
+  raise ENotImplemented.Create('Serialization not implemented yet');
+end;
+
+procedure THttpClient.UseSerializer(const useFunc: TUseSerializerFunc);
+begin
+  raise ENotImplemented.Create('Serialization not implemented yet');
+end;
 
 function THttpClient.WriteData(hRequest: HINTERNET; position : DWORD): boolean;
 var
@@ -580,7 +618,6 @@ begin
   stream.ReadBuffer(buffer, position, bufferSize);
 
   result := WinHttpWriteData(hRequest, buffer, bufferSize, nil);
-
 
 end;
 

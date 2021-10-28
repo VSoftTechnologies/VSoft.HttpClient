@@ -51,19 +51,23 @@ type
     property IsStringResponse : boolean read GetIsStringResponse;
   end;
 
+
+  IRestSerializer = interface
+  ['{80EFB40E-4D10-4E8C-8C61-D2E663391913}']
+    function GetSupportedContentTypes : TArray<string>;
+    function Deserialize(const returnType : PTypeInfo; const response : IHttpResponse) : TObject;
+    function Serialize(const obj : TObject) : string;
+    property SupportedContentTypes : TArray<string> read GetSupportedContentTypes;
+  end;
+
+
+
   TRequest = class;
 
   IHttpClientInternal = interface
   ['{1F09A9A8-A32E-41F3-811B-BA7D5B352185}']
     function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-//    function Send(const request : TRequest; const returnType : PTypeInfo;  const cancellationToken : ICancellationToken = nil) : TObject;overload;
-//    function Send(const request : TRequest; const entity : TObject;  const entityType : PTypeInfo; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-//    function Send(const request : TRequest; const entity : string;  const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-//    function Send2(const request : TRequest; const entity : TObject; const entityType : PTypeInfo; const returnType : PTypeInfo; const cancellationToken : ICancellationToken = nil) : TObject;
-
     procedure ReleaseRequest(const request : TRequest);
-
-
   end;
 
 
@@ -185,28 +189,42 @@ type
   end;
 
 
+  TUseSerializerFunc = reference to function : IRestSerializer;
+
+
+
   IHttpClient = interface
   ['{27ED69B0-7294-45F8-9DE8-DD0648B2EA80}']
     function GetBaseUri : string;
     procedure SetBaseUri(const value : string);
+
     function GetUserAgent : string;
     procedure SetUserAgent(const value : string);
+
     procedure SetAuthType(const value : THttpAuthType);
     function GetAuthType : THttpAuthType;
 
+    function GetUseHttp2 : boolean;
+    procedure SetUseHttp2(const value : boolean);
+
     function GetUserName : string;
-    function GetPassword : string;
     procedure SetUserName(const value : string);
+
+    function GetPassword : string;
     procedure SetPassword(const value : string);
 
-
     function CreateRequest(const resource : string) : TRequest;
+
+    procedure UseSerializer(const useFunc : TUseSerializerFunc);overload;
+    procedure UseSerializer(const serializer : IRestSerializer);overload;
 
     property AuthType   : THttpAuthType read GetAuthType write SetAuthType;
     property BaseUri    : string read GetBaseUri write SetBaseUri;
     property UserAgent  : string read GetUserAgent write SetUserAgent;
     property UserName   : string read GetUserName write SetUserName;
     property Password   : string read GetPassword write SetPassword;
+
+    property UseHttp2   : boolean read GetUseHttp2 write SetUseHttp2;
   end;
 
   THttpClientFactory = class
