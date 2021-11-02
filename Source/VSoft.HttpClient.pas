@@ -130,7 +130,7 @@ type
 
 
     // Replaces {placeholder} values in the Resource
-    function WithUrlSegement(const name : string; const value : string) : TRequest;
+    function AddUrlSegement(const name : string; const value : string) : TRequest;
 
     //borrowed from restsharp doco - we will replciate it's behaviour
     //This behaves differently based on the method. If you execute a GET call,
@@ -380,6 +380,7 @@ function TRequest.Delete<T>(const entity : T; const cancellationToken: ICancella
 var
   entityType : PTypeInfo;
 begin
+  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
   FHttpMethod := THttpMethod.DELETE;
   entityType := TypeInfo(T);
   //TODO : Serialize entity
@@ -415,6 +416,8 @@ var
   returnType : PTypeInfo;
   response : IHttpResponse;
 begin
+  raise ENotImplemented.Create('Deserialization not implemented yet');
+
   FHttpMethod := THttpMethod.GET;
   returnType := TypeInfo(T);
   response := Client.Send(self, cancellationToken);
@@ -450,6 +453,9 @@ var
   sFileName :string;
   j : integer;
 begin
+  if FHttpMethod = THttpMethod.GET then
+    exit(nil); //no body for get requests.
+
   if FContent <> nil then
   begin
     FContent.Seek(0, soBeginning);
@@ -552,6 +558,7 @@ var
   returnType : PTypeInfo;
   response : IHttpResponse;
 begin
+  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
   FHttpMethod := THttpMethod.PATCH;
   entityType := TypeInfo(T);
   returnType := TypeInfo(R);
@@ -565,6 +572,8 @@ var
   entityType : PTypeInfo;
   response : IHttpResponse;
 begin
+  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
+
   FHttpMethod := THttpMethod.PATCH;
   entityType := TypeInfo(T);
   response := Client.Send(self, cancellationToken);
@@ -584,6 +593,8 @@ var
   returnType : PTypeInfo;
   response : IHttpResponse;
 begin
+  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
+
   FHttpMethod := THttpMethod.POST;
   entityType := TypeInfo(T);
   returnType := TypeInfo(R);
@@ -596,6 +607,8 @@ function TRequest.Post<T>(const entity : T;  const cancellationToken: ICancellat
 var
   entityType : PTypeInfo;
 begin
+  raise ENotImplemented.Create('Serialization not implemented yet');
+
   FHttpMethod := THttpMethod.POST;
   entityType := TypeInfo(T);
 
@@ -616,6 +629,7 @@ var
   returnType : PTypeInfo;
   response : IHttpResponse;
 begin
+  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
   FHttpMethod := THttpMethod.PUT;
   entityType := TypeInfo(T);
   returnType := TypeInfo(R);
@@ -630,6 +644,7 @@ function TRequest.Put<T>(const entity : T;  const cancellationToken: ICancellati
 var
   entityType : PTypeInfo;
 begin
+  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
   FHttpMethod := THttpMethod.PUT;
   entityType := TypeInfo(T);
 
@@ -774,7 +789,7 @@ begin
   FRequestParams.Values[name] := value;
 end;
 
-function TRequest.WithUrlSegement(const name, value: string): TRequest;
+function TRequest.AddUrlSegement(const name, value: string): TRequest;
 begin
   result := Self;
   FUrlSegments.Values[name] := value;

@@ -71,6 +71,9 @@ type
     procedure UseSerializer(const serializer : IRestSerializer);overload;
 
 
+    function GetResourceFromRequest(const request : TRequest) : string;
+
+
     //IHttpClientInternal
     function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
     procedure ReleaseRequest(const request : TRequest);
@@ -189,6 +192,36 @@ end;
 function THttpClient.GetPassword: string;
 begin
   result := FPassword;
+end;
+
+function THttpClient.GetResourceFromRequest(const request: TRequest): string;
+var
+  i : integer;
+  queryString : string;
+begin
+  result := request.Resource;
+  if request.HtttpMethod <> THttpMethod.GET then
+      exit;
+
+  //for get request, we use the parameters
+
+  if request.UrlSegments.Count > 0 then
+  begin
+    for i := 0 to request.UrlSegments.Count -1 do
+      result := StringReplace(result, '{' + request.UrlSegments.Names[i] + '}', request.UrlSegments.ValueFromIndex[i], [rfReplaceAll,rfIgnoreCase]);
+  end;
+
+  if request.Parameters.Count > 0 then
+  begin
+    for i := 0 to request.Parameters.Count -1 do
+    begin
+      if i = 0 then
+        result := result + '?'
+      else
+        result := result + '&';
+      result := result + request.Parameters.Names[i] + '=' + request.Parameters.ValueFromIndex[i];
+    end;
+  end;
 end;
 
 function THttpClient.GetUseHttp2: boolean;
@@ -407,6 +440,8 @@ var
   buffer : TBytes;
   bufferSize : DWORD;
 
+  sResource : string;
+
 begin
   if FCurrentRequest <> nil then
     raise Exception.Create('A request is in progress.. winhttp is not reentrant!');
@@ -466,7 +501,9 @@ begin
 
     method := HttpMethodToString(request.HtttpMethod);
 
-    hRequest := WinHttpOpenRequest(hConnection, PWideChar(method), PWideChar(request.Resource), PWideChar(http_version),WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES , dwOpenRequestFlags);
+    sResource := GetResourceFromRequest(request);
+
+    hRequest := WinHttpOpenRequest(hConnection, PWideChar(method), PWideChar(sResource), PWideChar(http_version),WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES , dwOpenRequestFlags);
     if hRequest = nil then
     begin
       FClientError := GetLastError;
