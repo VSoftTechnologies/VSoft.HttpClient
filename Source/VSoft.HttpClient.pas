@@ -86,6 +86,10 @@ type
     FEncoding : TEncoding;
     FForceFormData : boolean;
 	  FFollowRedirects : boolean;
+    FUserName : string;
+    FPassword : string;
+    FProxyUserName : string;
+    FProxyPassword : string;
   protected
     function GetHeaders : TStrings;
     function GetParameters : TStrings;
@@ -186,6 +190,10 @@ type
     property Resource    : string read FResource write FResource;
     property ContentLength : Int64 read GetContentLength;
     property SaveAsFile  : string read FSaveAsFile write FSaveAsFile;
+    property UserName  : string read FUserName write FUserName;
+    property Passsword : string read FPassword write FPassword;
+    property ProxyUserName : string read FProxyUserName write FProxyUserName;
+    property ProxyPassword : string read FProxyPassword write FProxyPassword;
   end;
 
 
@@ -195,6 +203,9 @@ type
 
   IHttpClient = interface
   ['{27ED69B0-7294-45F8-9DE8-DD0648B2EA80}']
+    function GetAllowSelfSignedCertificates : boolean;
+    procedure SetAllowSelfSignedCertificates(const value : boolean);
+
     function GetBaseUri : string;
     procedure SetBaseUri(const value : string);
 
@@ -218,6 +229,7 @@ type
     procedure UseSerializer(const useFunc : TUseSerializerFunc);overload;
     procedure UseSerializer(const serializer : IRestSerializer);overload;
 
+    property AllowSelfSignedCertificates : boolean read GetAllowSelfSignedCertificates write SetAllowSelfSignedCertificates;
     property AuthType   : THttpAuthType read GetAuthType write SetAuthType;
     property BaseUri    : string read GetBaseUri write SetBaseUri;
     property UserAgent  : string read GetUserAgent write SetUserAgent;
@@ -242,7 +254,7 @@ type
 
   function HttpMethodToString(const value : THttpMethod) : string;
 
-  function ClientErrorToString(const value : NativeUInt) : string;
+  function ClientErrorToString(const value : HRESULT) : string;
 
 const
   cAcceptHeader = 'Accept';
@@ -263,10 +275,9 @@ implementation
 uses
   VSoft.WinHttp.Api,
   VSoft.HttpClient.WinHttpClient,
-//  VSoft.HttpClient.Request,
   VSoft.HttpClient.MultipartFormData;
 
-function ClientErrorToString(const value : NativeUInt) : string;
+function ClientErrorToString(const value : HRESULT) : string;
 begin
   case value of
     ERROR_WINHTTP_OUT_OF_HANDLES : result := 'Out of handles.';
@@ -337,6 +348,8 @@ begin
     ERROR_WINHTTP_RESPONSE_DRAIN_OVERFLOW : result := 'An incoming response exceeds an internal WinHTTP size limit.';
     ERROR_WINHTTP_CLIENT_CERT_NO_PRIVATE_KEY : result := 'The context for the SSL client certificate does not have a private key associated with it. The client certificate may have been imported to the computer without the private key.';
     ERROR_WINHTTP_CLIENT_CERT_NO_ACCESS_PRIVATE_KEY : result := 'The application does not have the required privileges to access the private key associated with the client certificate.';
+
+    E_UNEXPECTED : result := 'Unexpected value';
   else
     result := 'Unknown Error';
   end;

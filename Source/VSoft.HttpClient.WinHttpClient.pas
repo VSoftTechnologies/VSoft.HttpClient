@@ -33,21 +33,32 @@ type
     FBytesWritten : DWORD;
     FClientError : DWORD;
     FUseHttp2 : boolean;
-  protected
-    procedure HTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
+    FAllowSelfSignedCertificates : boolean;
+    FLastStatusCode : DWORD;
+    FProxyAuthScheme : DWORD;
 
-    procedure ReadHeaders(hRequest : HINTERNET);
+    FData : Pointer;
+    FDataLength : DWORD;
+
+  protected
+    procedure OnHTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
+    function OnHeadersAvailable(hRequest: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD) : DWORD;
+    function HandleProxyAuthResponse(hRequest : HINTERNET) : DWORD;
+    function HandleAccessDeniedResponse(hRequest : HINTERNET) : DWORD;
+    function DoAuthentication(hRequest : HINTERNET; dwAuthenticationScheme : DWORD; dwAuthTarget : DWORD) : HRESULT;
     function ReadData(hRequest : HINTERNET; dataSize : DWORD) : boolean;
 
     function WriteData(hRequest : HINTERNET; position : DWORD) : boolean;
+    function WriteHeaders(hRequest : HINTERNET; const headers : TStrings) : DWORD;
 
+    function ConfigureWinHttpRequest(hRequest : HINTERNET; const request : TRequest) : DWORD;
 
-    function WriteHeaders(hRequest : HINTERNET; const headers : TStrings) : boolean;
-
-    function ConfigureWinHttpRequest(hRequest : HINTERNET; const request : TRequest) : boolean;
-
+    function ChooseAuth(dwSupportedSchemes : DWORD) : DWORD;
 
     procedure EnsureSession;
+
+    function GetAllowSelfSignedCertificates : boolean;
+    procedure SetAllowSelfSignedCertificates(const value : boolean);
 
     function GetBaseUri : string;
     procedure SetBaseUri(const value : string);
@@ -94,6 +105,8 @@ uses
 //TODO : What is the optimum buffer size?
 const cReceiveBufferSize : DWORD = 32 * 1024;
 
+//const E_UNEXPECTED = HRESULT($8000FFFF);
+
 type
   TRequestCracker = class(TRequest);
 
@@ -104,7 +117,7 @@ var
 begin
   client := THttpClient(dwContext);
   if client <> nil then
-    client.HTTPCallback(hInternet, dwInternetStatus, lpvStatusInformation, dwStatusInformationLength);
+    client.OnHTTPCallback(hInternet, dwInternetStatus, lpvStatusInformation, dwStatusInformationLength);
 
 end;
 
@@ -117,29 +130,52 @@ end;
 
 { THttpClient }
 
-function THttpClient.ConfigureWinHttpRequest(hRequest: HINTERNET; const request: TRequest): boolean;
+function THttpClient.ChooseAuth(dwSupportedSchemes: DWORD): DWORD;
+begin
+  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NEGOTIATE > 0 then
+    exit(WINHTTP_AUTH_SCHEME_NEGOTIATE);
+  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NTLM > 0 then
+    exit(WINHTTP_AUTH_SCHEME_NTLM);
+  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_PASSPORT > 0 then
+    exit(WINHTTP_AUTH_SCHEME_PASSPORT);
+  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_DIGEST > 0 then
+    exit(WINHTTP_AUTH_SCHEME_DIGEST);
+  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_BASIC > 0 then
+    exit(WINHTTP_AUTH_SCHEME_BASIC);
+
+  result := 0;
+
+end;
+
+function THttpClient.ConfigureWinHttpRequest(hRequest: HINTERNET; const request: TRequest): DWORD;
 var
   option : DWORD;
 begin
   result := WriteHeaders(hRequest, request.Headers);
-  if not result then
+  if result <> S_OK then
     exit;
 
   //it's a rest client, we don't want to send cookies
   option := WINHTTP_DISABLE_COOKIES;
-  result := WinHttpSetOption(hRequest, WINHTTP_OPTION_DISABLE_FEATURE, @option, sizeof(option));
-  if not result then
-    exit;
+  if not WinHttpSetOption(hRequest, WINHTTP_OPTION_DISABLE_FEATURE, @option, sizeof(option)) then
+    exit(GetLastError);
+
   if not request.FollowRedirects then
   begin
     option := WINHTTP_DISABLE_REDIRECTS;
-    result := WinHttpSetOption(hRequest, WINHTTP_OPTION_DISABLE_FEATURE, @option, sizeof(option));
-    if not result then
-      exit;
+    if not WinHttpSetOption(hRequest, WINHTTP_OPTION_DISABLE_FEATURE, @option, sizeof(option)) then
+      exit(GetLastError);
   end;
 
-
-
+  if FAllowSelfSignedCertificates then
+  begin
+    option := SECURITY_FLAG_IGNORE_UNKNOWN_CA +
+              SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE +
+              SECURITY_FLAG_IGNORE_CERT_CN_INVALID +
+              SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
+    if not WinHttpSetOption(hRequest, WINHTTP_OPTION_SECURITY_FLAGS,@option,sizeof(option)) then
+      result := GetLastError;
+  end;
 end;
 
 constructor THttpClient.Create(const baseUri : string);
@@ -178,6 +214,11 @@ begin
 end;
 
 
+function THttpClient.GetAllowSelfSignedCertificates: boolean;
+begin
+  result := FAllowSelfSignedCertificates;
+end;
+
 function THttpClient.GetAuthType: THttpAuthType;
 begin
   result := FAuthTyp;
@@ -197,7 +238,6 @@ end;
 function THttpClient.GetResourceFromRequest(const request: TRequest): string;
 var
   i : integer;
-  queryString : string;
 begin
   result := request.Resource;
   if request.HtttpMethod <> THttpMethod.GET then
@@ -239,7 +279,165 @@ begin
   result := FUserName;
 end;
 
-procedure THttpClient.HTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
+function THttpClient.DoAuthentication(hRequest : HINTERNET; dwAuthenticationScheme : DWORD; dwAuthTarget : DWORD) : HRESULT;
+begin
+  result := ERROR_WINHTTP_LOGIN_FAILURE;
+  case dwAuthTarget  of
+    WINHTTP_AUTH_TARGET_SERVER :
+    begin
+      if FCurrentRequest.UserName <> '' then
+      begin
+        if not WinHttpSetCredentials(hRequest, dwAuthTarget, dwAuthenticationScheme, PChar(FCurrentRequest.UserName), PChar(FCurrentRequest.Passsword),nil) then
+          result := S_OK
+        else
+          result := GetLastError;
+      end;
+
+    end;
+    WINHTTP_AUTH_TARGET_PROXY :
+    begin
+      if FCurrentRequest.ProxyUserName <> '' then
+      begin
+        if WinHttpSetCredentials(hRequest, dwAuthTarget, dwAuthenticationScheme, PChar(FCurrentRequest.ProxyUserName), PChar(FCurrentRequest.ProxyPassword),nil) then
+          result := S_OK
+        else
+          result := GetLastError;
+      end;
+
+    end;
+  else
+    result := E_UNEXPECTED;
+  end;
+end;
+
+function THttpClient.HandleAccessDeniedResponse(hRequest : HINTERNET): DWORD;
+var
+  dwSupportedSchemes  : DWORD;
+  dwFirstScheme       : DWORD;
+  dwAuthTarget        : DWORD;
+  dwAuthenticationScheme : DWORD;
+begin
+  //fail if we get the same response code again
+  if FLastStatusCode = HTTP_STATUS_DENIED then
+    exit(ERROR_WINHTTP_LOGIN_FAILURE);
+
+  if not WinHttpQueryAuthSchemes(hRequest, dwSupportedSchemes, dwFirstScheme, dwAuthTarget) then
+    exit(GetLastError);
+
+  dwAuthenticationScheme := ChooseAuth(dwSupportedSchemes);
+  if dwAuthenticationScheme = 0 then  //no supported scheme so we have no way to authenticate.
+    exit(ERROR_WINHTTP_LOGIN_FAILURE);
+
+  result := DoAuthentication(hRequest, dwAuthenticationScheme, dwAuthTarget);
+  if result <> S_OK then
+    exit;
+
+  //Resend the Proxy authentication details also if used before, otherwise we could end up in a 407-401-407-401 loop
+  if FProxyAuthScheme <> 0 then
+  begin
+    result := DoAuthentication(hRequest, dwAuthenticationScheme, WINHTTP_AUTH_TARGET_PROXY);
+    if result <> S_OK then
+      exit;
+  end;
+
+  FLastStatusCode := HTTP_STATUS_DENIED;
+
+  //need to send the request again
+  //not sure if we need to configure the headers again?
+  ConfigureWinHttpRequest(hRequest, FCurrentRequest);
+  if not WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0, FData, FDataLength, FDataLength, NativeUInt(Pointer(Self))) then
+    result := GetLastError
+  else
+    result := S_OK;
+
+end;
+
+function THttpClient.HandleProxyAuthResponse(hRequest : HINTERNET): DWORD;
+var
+  dwSupportedSchemes  : DWORD;
+  dwFirstScheme       : DWORD;
+  dwAuthTarget        : DWORD;
+begin
+  //fail if we get the same response code again
+  if FLastStatusCode = HTTP_STATUS_PROXY_AUTH_REQ then
+    exit(ERROR_WINHTTP_LOGIN_FAILURE);
+
+  if not WinHttpQueryAuthSchemes(hRequest, dwSupportedSchemes, dwFirstScheme, dwAuthTarget) then
+    exit(GetLastError);
+
+  FProxyAuthScheme := ChooseAuth(dwSupportedSchemes);
+  if FProxyAuthScheme = 0 then  //no supported scheme so we have no way to authenticate.
+    exit(ERROR_WINHTTP_LOGIN_FAILURE);
+
+  result := DoAuthentication(hRequest, FProxyAuthScheme, dwAuthTarget);
+  if result <> S_OK then
+    exit;
+
+  FLastStatusCode := HTTP_STATUS_PROXY_AUTH_REQ;
+
+  //need to send the request again
+  //not sure if we need to configure the headers again?
+  ConfigureWinHttpRequest(hRequest, FCurrentRequest);
+  if not WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0, FData, FDataLength, FDataLength, NativeUInt(Pointer(Self))) then
+    result := GetLastError
+  else
+    result := S_OK;
+
+
+end;
+
+function QueryStatusCode(hRequest: HINTERNET; var statusCode : DWORD) : DWORD;
+var
+  statusCodeSize : DWORD;
+begin
+  statusCodeSize := Sizeof(DWORD);
+  result := S_OK;
+  if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE + WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,　@statusCode, statusCodeSize, WINHTTP_NO_HEADER_INDEX) then
+    result := GetLastError;
+end;
+
+function THttpClient.OnHeadersAvailable(hRequest : HINTERNET;  dwInternetStatus: DWORD; lpvStatusInformation: Pointer;  dwStatusInformationLength: DWORD) : DWORD;
+var
+  statusCode : DWORD;
+  bufferSize : DWORD;
+  headers : string;
+  lastError : DWORD;
+begin
+  result := QueryStatusCode(hRequest, statusCode);
+  if result <> S_OK then
+    exit;
+  FLastStatusCode := statusCode;
+  FResponse.SetStatusCode(statusCode);
+  if statusCode = HTTP_STATUS_PROXY_AUTH_REQ then
+    HandleProxyAuthResponse(hRequest)
+  else if statusCode = HTTP_STATUS_DENIED then
+    HandleAccessDeniedResponse(hRequest)
+  else if ((statusCode div 100) <> 2) then //any 2xx is good
+    exit(ERROR_WINHTTP_INVALID_HEADER);
+
+  FLastStatusCode := statusCode;
+
+
+  if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, nil, bufferSize, WINHTTP_NO_HEADER_INDEX) then
+  begin
+    lastError := GetLastError;
+    if lastError <> ERROR_INSUFFICIENT_BUFFER then
+      Exit(lastError);
+  end;
+
+  SetLength(headers, bufferSize div SizeOf(Char) - 1);
+
+  if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, PChar(headers), bufferSize, WINHTTP_NO_HEADER_INDEX) then
+    Exit(GetLastError);
+
+  FResponse.SetHeaders(headers);
+
+  //this will cause a data available callback
+  if not WinHttpQueryDataAvailable(hRequest, nil) then
+    exit(GetLastError);
+end;
+
+procedure THttpClient.OnHTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
 var
   dataSize : DWORD;
 begin
@@ -253,13 +451,9 @@ begin
 
     WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE :
     begin
-      ReadHeaders(hInternet);
-      //this will cause a data available callback
-      if not WinHttpQueryDataAvailable(hInternet, nil) then
-      begin
-        FClientError := GetLastError;
+      FClientError := OnHeadersAvailable(hInternet, dwInternetStatus, lpvStatusInformation, dwStatusInformationLength);
+      if FClientError <> S_OK then
         FWaitEvent.SetEvent; //unblock
-      end
     end;
 
     WINHTTP_CALLBACK_STATUS_DATA_AVAILABLE :
@@ -277,7 +471,6 @@ begin
           FClientError := GetLastError;
           FWaitEvent.SetEvent; //unblock
         end;
-
       end;
     end;
 
@@ -372,37 +565,6 @@ begin
   result := WinHttpReadData(hRequest, FReceiveBuffer[0], bufferSize , @FLastReceiveBlockSize);
 end;
 
-procedure THttpClient.ReadHeaders(hRequest: HINTERNET);
-var
-  bufferSize : DWORD;
-  headers : string;
-  statusCode : DWORD;
-  statusCodeSize : DWORD;
-
-begin
-  statusCodeSize := Sizeof(DWORD);
-
-  if WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE + WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,　@statusCode, statusCodeSize, WINHTTP_NO_HEADER_INDEX) then
-    FResponse.SetStatusCode(statusCode);
-
-  if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, nil, bufferSize, WINHTTP_NO_HEADER_INDEX) then
-  begin
-    if GetLastError <> ERROR_INSUFFICIENT_BUFFER then
-    begin
-      FClientError := GetLastError;
-      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
-    end;
-  end;
-
-  SetLength(headers, bufferSize div SizeOf(Char) - 1);
-
-  if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, PChar(headers), bufferSize, WINHTTP_NO_HEADER_INDEX) then
-  begin
-    FClientError := GetLastError;
-    raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
-  end;
-  FResponse.SetHeaders(headers)
-end;
 
 procedure THttpClient.ReleaseRequest(const request: TRequest);
 begin
@@ -432,22 +594,21 @@ var
   handleCount : integer;
   option : DWORD;
   method : string;
-  dataLength : DWORD;
-
-  data : Pointer;
 
   stream : TStream;
   buffer : TBytes;
   bufferSize : DWORD;
 
   sResource : string;
-
+  hr : DWORD;
 begin
   if FCurrentRequest <> nil then
     raise Exception.Create('A request is in progress.. winhttp is not reentrant!');
   try
     result := nil;
     FClientError := 0;
+    FLastStatusCode := 0;
+    FProxyAuthScheme := 0;
     FLastReceiveBlockSize := 0;
     FBytesWritten := 0;
     FCurrentRequest := request;
@@ -510,13 +671,13 @@ begin
       raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
     end;
     try
-
       pCallback := WinHttpSetStatusCallback(hRequest, _HTTPCallback, WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS + WINHTTP_CALLBACK_FLAG_REDIRECT, 0);
 
       if Assigned(pCallBack) then
         raise Exception.Create('Callback was already set!');
 
-      if not ConfigureWinHttpRequest(hRequest, request) then
+      hr := ConfigureWinHttpRequest(hRequest, request);
+      if hr <> S_OK then
         raise Exception.Create('Could not configure request : ' + SysErrorMessage(GetLastError) );
 
       handleCount := 1;
@@ -527,28 +688,27 @@ begin
          Inc(handleCount);
       end;
 
-      dataLength := request.ContentLength;
+      FDataLength := request.ContentLength;
 
-      if (request.HtttpMethod <> THttpMethod.GET) and (dataLength > 0) then
+      if (request.HtttpMethod <> THttpMethod.GET) and (FDataLength > 0) then
       begin
         stream := TRequestCracker(FCurrentRequest).GetBody;
         bufferSize := TRequestCracker(FCurrentRequest).GetContentLength;
         SetLength(buffer,bufferSize);
         ZeroMemory(@buffer[0], bufferSize);
         stream.ReadBuffer(buffer,0 , bufferSize);
-        data := @buffer[0];
-        dataLength := dataLength;
-        FBytesWritten := dataLength;
+        FData := @buffer[0];
+        FBytesWritten := FDataLength;
       end
       else
       begin
-        data := WINHTTP_NO_REQUEST_DATA;
-        dataLength := 0;
+        FData := WINHTTP_NO_REQUEST_DATA;
+        FDataLength := 0;
       end;
 
       FResponse := THttpResponse.Create(0,'','',request.SaveAsFile); //for now
 
-      bResult := WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0, data, dataLength, dataLength, NativeUInt(Pointer(Self)) );
+      bResult := WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0, FData, FDataLength, FDataLength, NativeUInt(Pointer(Self)) );
 
       if not bResult then
         exit;
@@ -594,6 +754,11 @@ begin
   end;
 end;
 
+
+procedure THttpClient.SetAllowSelfSignedCertificates(const value: boolean);
+begin
+  FAllowSelfSignedCertificates := value;
+end;
 
 procedure THttpClient.SetAuthType(const value: THttpAuthType);
 begin
@@ -658,14 +823,15 @@ begin
 
 end;
 
-function THttpClient.WriteHeaders(hRequest: HINTERNET; const headers: TStrings): boolean;
+function THttpClient.WriteHeaders(hRequest: HINTERNET; const headers: TStrings): DWORD;
 var
   sHeaders : string;
   i: Integer;
   sCharSet : string;
 begin
+  result := S_OK;
   if headers.Count = 0 then
-    exit(true);
+    exit;
 
   sCharSet := TRequestCracker(FCurrentRequest).GetCharSet;
 
@@ -680,7 +846,8 @@ begin
       sHeaders := sHeaders + #13#10;
   end;
 
-  result := WinHttpAddRequestHeaders(hRequest, PWideChar(sHeaders), $ffffffff, WINHTTP_ADDREQ_FLAG_ADD);
+  if not WinHttpAddRequestHeaders(hRequest, PWideChar(sHeaders), $ffffffff, WINHTTP_ADDREQ_FLAG_ADD) then
+    result := GetLastError;
 end;
 
 end.
