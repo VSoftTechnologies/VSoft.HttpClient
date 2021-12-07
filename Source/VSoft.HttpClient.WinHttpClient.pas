@@ -411,9 +411,9 @@ begin
   if statusCode = HTTP_STATUS_PROXY_AUTH_REQ then
     HandleProxyAuthResponse(hRequest)
   else if statusCode = HTTP_STATUS_DENIED then
-    HandleAccessDeniedResponse(hRequest)
-  else if ((statusCode div 100) <> 2) then //any 2xx is good
-    exit(ERROR_WINHTTP_INVALID_HEADER);
+    HandleAccessDeniedResponse(hRequest);
+//  else if ((statusCode div 100) <> 2) then //any 2xx is good
+//    exit(ERROR_WINHTTP_INVALID_HEADER);
 
   FLastStatusCode := statusCode;
 
@@ -676,6 +676,8 @@ begin
       if Assigned(pCallBack) then
         raise Exception.Create('Callback was already set!');
 
+      FDataLength := request.ContentLength;    //need to do this before configurerequest as if there are files it will set the content type.
+
       hr := ConfigureWinHttpRequest(hRequest, request);
       if hr <> S_OK then
         raise Exception.Create('Could not configure request : ' + SysErrorMessage(GetLastError) );
@@ -688,7 +690,6 @@ begin
          Inc(handleCount);
       end;
 
-      FDataLength := request.ContentLength;
 
       if (request.HtttpMethod <> THttpMethod.GET) and (FDataLength > 0) then
       begin
@@ -842,7 +843,7 @@ begin
     else
       sHeaders := sHeaders + headers.Names[i] + ': ' +headers.ValueFromIndex[i];
 
-    if i < headers.count -1 then
+//    if i < headers.count -1 then
       sHeaders := sHeaders + #13#10;
   end;
 

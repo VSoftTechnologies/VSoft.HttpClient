@@ -797,8 +797,8 @@ begin
   if sContentType = '' then
     sContentType := GetMimeType(fileName);
   WriteString(cContentTypeHeader + ': ' + sContentType + #13#10);
-  FDataStream.CopyFrom(stream, 0);
-  WriteString('');
+  stream.Seek(0, soFromBeginning);
+  FDataStream.CopyFrom(stream, stream.Size);
 end;
 
 class procedure TMultipartFormData.AddWindowsMimeTypes;
@@ -889,17 +889,16 @@ end;
 function TMultipartFormData.Generate: TStream;
 begin
   //add the final boundary
-  WriteString('--' + FBoundary + '--');
+  WriteString(#13#10 + '--' + FBoundary + '--');
   FDataStream.Seek(0,soFromBeginning); //this is required as the http request doesn't rewind the stream
 
   result := FDataStream;
-//  FDataStream := nil;
-  GenerateUniqueBoundry;
+  FDataStream := nil;    //this is important as the caller takes ownership.
 end;
 
 procedure TMultipartFormData.GenerateUniqueBoundry;
 begin
-  FBoundary := '----------------------' + FormatDateTime('mmddyyhhnnsszzz', Now);
+  FBoundary := '-----------' + FormatDateTime('mmddyyhhnnsszzz', Now) + '-----------';
 end;
 
 function TMultipartFormData.GetBoundary: string;

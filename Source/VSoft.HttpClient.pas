@@ -409,6 +409,8 @@ begin
   FHeaders.Free;
   FRequestParams.Free;
   FUrlSegments.Free;
+  if FContent <> nil then
+    FContent.Free;
   inherited;
 end;
 
@@ -489,11 +491,11 @@ begin
       if j > 0 then
         formdata.AddFile(Copy(sFileName, 1, j-1),  Copy(sFileName, j+1, Length(sFileName)),FFiles.ValueFromIndex[i])
       else
-        formdata.AddFile('files',  Copy(sFileName, j+1, Length(sFileName)),FFiles.ValueFromIndex[i]);
+        formdata.AddFile('file' + IntToStr(i),  Copy(sFileName, j+1, Length(sFileName)),FFiles.ValueFromIndex[i]);
     end;
-    //generate creates a new boundary so we need to upate the contentype before generating
+    FContent := formdata.Generate; //taking ownership here!
     SetContentType(formdata.ContentType);
-    result := formdata.Generate;
+    result := FContent;
   end
   else if FRequestParams.Count > 0 then
   begin
@@ -787,7 +789,7 @@ begin
    if fieldName <> '' then
     FFiles.Add(fieldName + ',' + filePath + '=' + contentType)
   else
-    FFiles.Add('files,' + filePath + '=' + contentType);
+    FFiles.Add(ExtractFileName(filePath) + ',' + filePath + '=' + contentType);
 end;
 
 function TRequest.WithHeader(const name, value: string): TRequest;
