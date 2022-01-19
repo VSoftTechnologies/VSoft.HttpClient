@@ -6,7 +6,8 @@ uses
   System.Classes,
   System.SysUtils,
   System.Typinfo,
-  VSoft.CancellationToken;
+  VSoft.CancellationToken,
+  VSoft.Uri;
 
 
 type
@@ -68,6 +69,8 @@ type
   ['{1F09A9A8-A32E-41F3-811B-BA7D5B352185}']
     function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
     procedure ReleaseRequest(const request : TRequest);
+    function GetBaseUri: string;
+    function GetUri : IUri;
   end;
 
 
@@ -79,7 +82,6 @@ type
     FRequestParams : TStringList;
     FFiles : TStringList;
     FUrlSegments : TStringList;
-    FResource : string;
     FContent : TStream;
     FOwnsContent : boolean;
     FSaveAsFile : string;
@@ -90,6 +92,8 @@ type
     FPassword : string;
     FProxyUserName : string;
     FProxyPassword : string;
+
+    FURI : IUri;
   protected
     function GetHeaders : TStrings;
     function GetParameters : TStrings;
@@ -116,7 +120,8 @@ type
     function Client : IHttpClientInternal;
 
   public
-    constructor Create(const client : TObject; const resource : string);
+    constructor Create(const client : TObject; const resource : string);overload;
+    constructor Create(const client : TObject; const uri : IUri);overload;
     destructor Destroy; override;
 
 
@@ -187,7 +192,7 @@ type
 
     property FollowRedirects : boolean read FFollowRedirects write FFollowRedirects;
     property HtttpMethod : THttpMethod read FHttpMethod;
-    property Resource    : string read FResource write FResource;
+    property Resource    : string read GetResource write SetResource;
     property ContentLength : Int64 read GetContentLength;
     property SaveAsFile  : string read FSaveAsFile write FSaveAsFile;
     property UserName  : string read FUserName write FUserName;
@@ -224,7 +229,8 @@ type
     function GetPassword : string;
     procedure SetPassword(const value : string);
 
-    function CreateRequest(const resource : string) : TRequest;
+    function CreateRequest(const resource : string) : TRequest;overload;
+    function CreateRequest(const uri : IUri) : TRequest;overload;
 
     procedure UseSerializer(const useFunc : TUseSerializerFunc);overload;
     procedure UseSerializer(const serializer : IRestSerializer);overload;
@@ -240,7 +246,9 @@ type
   end;
 
   THttpClientFactory = class
-   class function CreateClient(const baseUri: string = ''): IHttpClient;
+   class function CreateClient(const uri: string): IHttpClient;overload;
+   class function CreateClient(const uri: IUri): IHttpClient;overload;
+
   end;
 
   EHttpClientException = class(Exception)
@@ -372,15 +380,46 @@ begin
   FClient.GetInterface(IHttpClientInternal, result)
 end;
 
-constructor TRequest.Create(const client: TObject;  const resource: string);
+constructor TRequest.Create(const client: TObject; const uri: IUri);
+var
+  queryParam : TQueryParam;
 begin
   FClient := client;
-  FResource := resource;
+  FURI := uri;
   FFiles := TStringlist.Create;
   FHeaders := TStringList.Create;
   FRequestParams := TStringList.Create;
   FUrlSegments := TStringList.Create;
   FFollowRedirects := true;
+
+  if Length(uri.QueryParams) > 0 then
+  begin
+    for queryParam in uri.QueryParams do
+      WithParameter(queryParam.Name, queryParam.Value);
+  end;
+end;
+
+constructor TRequest.Create(const client: TObject;  const resource: string);
+var
+  uri : IUri;
+  error : string;
+  clientInf : IHttpClientInternal;
+  sBaseUri : string;
+begin
+  if not client.GetInterface(IHttpClientInternal, clientInf) then
+    raise Exception.Create('Client does not implement interface!');
+  sBaseUri := clientInf.GetBaseUri;
+
+  if sBaseUri <> '' then
+     sBaseUri := sBaseUri + '/' + resource
+  else
+    sBaseUri := resource;
+
+  if not TUriFactory.TryParseWithError(sBaseUri, true, uri, error) then
+    raise EArgumentException.Create('Invalid Uri : ' + error);
+
+  Create(client, uri);
+
 end;
 
 function TRequest.Delete(const cancellationToken: ICancellationToken): IHttpResponse;
@@ -553,7 +592,7 @@ end;
 
 function TRequest.GetResource: string;
 begin
-  result := FResource;
+  result := FURI.AbsolutePath;
 end;
 
 function TRequest.GetUrlSegments: TStrings;
@@ -695,7 +734,7 @@ end;
 
 procedure TRequest.SetResource(const value: string);
 begin
-  FResource := value;
+ FURI.Path := value;
 end;
 
 
@@ -812,9 +851,20 @@ end;
 
 { THttpClientFactory }
 
-class function THttpClientFactory.CreateClient( const baseUri: string): IHttpClient;
+class function THttpClientFactory.CreateClient(const uri : string): IHttpClient;
+var
+  theUri : IUri;
+  error : string;
 begin
-  result := THttpClient.Create(baseUri);
+  if not TUriFactory.TryParseWithError(uri, true, theUri, error)  then
+    raise EArgumentOutOfRangeException.Create('Invalid Uri : ' + error );
+
+  result := THttpClient.Create(theUri);
+end;
+
+class function THttpClientFactory.CreateClient(const uri: IUri): IHttpClient;
+begin
+  result := THttpClient.Create(uri);
 end;
 
 { EHttpClientException }

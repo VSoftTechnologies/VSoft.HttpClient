@@ -10,6 +10,7 @@ uses
   System.Classes,
   WinApi.Windows,
   VSoft.CancellationToken,
+  VSoft.URI,
   VSoft.HttpClient,
   VSoft.WinHttp.Api,
   VSoft.HttpClient.Response;
@@ -18,8 +19,9 @@ uses
 type
   THttpClient = class(TInterfacedObject, IHttpClient, IHttpClientInternal)
   private
+    FUri : IUri;
+
     FSession : HINTERNET;
-    FBaseUri : string;
     FUserAgent : string;
     FRequests : TList<TRequest>;
     FAuthTyp : THttpAuthType;
@@ -64,6 +66,7 @@ type
     procedure SetBaseUri(const value : string);
     function GetUserAgent : string;
     procedure SetUserAgent(const value : string);
+    function GetUri : IUri;
 
     procedure SetAuthType(const value : THttpAuthType);
     function GetAuthType : THttpAuthType;
@@ -76,7 +79,9 @@ type
     procedure SetUseHttp2(const value : boolean);
 
 
-    function CreateRequest(const resource : string) : TRequest;
+    function CreateRequest(const resource : string) : TRequest;overload;
+    function CreateRequest(const uri : IUri) : TRequest;overload;
+
 
     procedure UseSerializer(const useFunc : TUseSerializerFunc);overload;
     procedure UseSerializer(const serializer : IRestSerializer);overload;
@@ -91,7 +96,7 @@ type
 
 
   public
-    constructor Create(const baseUri : string);
+    constructor Create(const uri : IUri);
     destructor Destroy;override;
   end;
 
@@ -123,8 +128,18 @@ end;
 
 function THttpClient.CreateRequest(const resource: string): TRequest;
 begin
-  result := TRequest.Create(Self, resource);
+  if resource = '' then
+    result := TRequest.Create(Self, FUri)
+  else
+    result := TRequest.Create(Self, resource);
   FRequests.Add(result); //track requests to ensure they get freed.
+end;
+
+function THttpClient.CreateRequest(const uri: IUri): TRequest;
+begin
+  result := TRequest.Create(Self, uri);
+  FRequests.Add(result); //track requests to ensure they get freed.
+
 end;
 
 
@@ -178,13 +193,14 @@ begin
   end;
 end;
 
-constructor THttpClient.Create(const baseUri : string);
+constructor THttpClient.Create(const uri : IUri);
 begin
   FRequests := TList<TRequest>.Create;
-  FBaseUri := baseUri;
+  FUri := uri;
   FUserAgent := 'VSoft.HttpClient';
   FWaitEvent := TEvent.Create(nil,false, false,'');
 end;
+
 
 
 destructor THttpClient.Destroy;
@@ -226,7 +242,7 @@ end;
 
 function THttpClient.GetBaseUri: string;
 begin
-  result := FBaseUri;
+  result := FUri.BaseUriString;
 end;
 
 
@@ -262,6 +278,11 @@ begin
       result := result + request.Parameters.Names[i] + '=' + request.Parameters.ValueFromIndex[i];
     end;
   end;
+end;
+
+function THttpClient.GetUri: IUri;
+begin
+  result := FUri;
 end;
 
 function THttpClient.GetUseHttp2: boolean;
@@ -631,7 +652,7 @@ begin
     urlComp.dwUrlPathLength   := DWORD(-1);
     urlComp.dwExtraInfoLength := DWORD(-1);
 
-    if not WinHttpCrackUrl(PWideChar(FBaseUri), 0, 0, urlComp ) then
+    if not WinHttpCrackUrl(PWideChar(FUri.BaseUriString), 0, 0, urlComp ) then
     begin
       FClientError := GetLastError;
       raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
@@ -656,7 +677,7 @@ begin
       raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
     end;
 
-    dwOpenRequestFlags := WINHTTP_FLAG_REFRESH;
+    dwOpenRequestFlags := WINHTTP_FLAG_REFRESH + WINHTTP_FLAG_ESCAPE_PERCENT;
     if urlComp.nScheme = INTERNET_SCHEME_HTTPS then
       dwOpenRequestFlags := dwOpenRequestFlags + WINHTTP_FLAG_SECURE;
 
@@ -768,7 +789,7 @@ end;
 
 procedure THttpClient.SetBaseUri(const value: string);
 begin
-  FBaseUri := value;
+  FUri.BaseUriString := value;
 end;
 
 procedure THttpClient.SetPassword(const value: string);
@@ -842,9 +863,7 @@ begin
       sHeaders := sHeaders + cContentTypeHeader + ': ' +headers.ValueFromIndex[i] + '; charset=' + sCharSet
     else
       sHeaders := sHeaders + headers.Names[i] + ': ' +headers.ValueFromIndex[i];
-
-//    if i < headers.count -1 then
-      sHeaders := sHeaders + #13#10;
+    sHeaders := sHeaders + #13#10;
   end;
 
   if not WinHttpAddRequestHeaders(hRequest, PWideChar(sHeaders), $ffffffff, WINHTTP_ADDREQ_FLAG_ADD) then
