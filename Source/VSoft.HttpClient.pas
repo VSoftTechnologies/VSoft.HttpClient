@@ -281,6 +281,7 @@ const
 implementation
 
 uses
+  System.StrUtils,
   VSoft.WinHttp.Api,
   VSoft.HttpClient.WinHttpClient,
   VSoft.HttpClient.MultipartFormData;
@@ -399,6 +400,20 @@ begin
   end;
 end;
 
+function CombineUriParts(const a, b : string) : string;
+begin
+  result := '';
+  if (not EndsText('/', a)) and (not StartsText('/',b)) then //neither
+    result := a + '/' + b
+  else if (EndsText('/', a)) and StartsText('/',b)  then // both
+  begin
+    result := Copy(a, 1, Length(a) -1) + b;
+  end
+  else //one of
+    result := a + b
+end;
+
+
 constructor TRequest.Create(const client: TObject;  const resource: string);
 var
   uri : IUri;
@@ -409,9 +424,8 @@ begin
   if not client.GetInterface(IHttpClientInternal, clientInf) then
     raise Exception.Create('Client does not implement interface!');
   sBaseUri := clientInf.GetBaseUri;
-
   if sBaseUri <> '' then
-     sBaseUri := sBaseUri + '/' + resource
+     sBaseUri := CombineUriParts(sBaseUri, resource)
   else
     sBaseUri := resource;
 
