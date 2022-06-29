@@ -1,4 +1,4 @@
-unit VSoft.HttpClient;
+﻿unit VSoft.HttpClient;
 
 interface
 

@@ -1,9 +1,9 @@
-{***************************************************************************}
+﻿{***************************************************************************}
 {                                                                           }
 {           VSoft.HttpClient - A wrapper over WinHttp                       }
 {                              modelled on restSharp                        }
 {                                                                           }
-{           Copyright � 2020 Vincent Parrett and contributors               }
+{           Copyright © 2020 Vincent Parrett and contributors               }
 {                                                                           }
 {           vincent@finalbuilder.com                                        }
 {           https://www.finalbuilder.com                                    }
