@@ -413,7 +413,7 @@ var
 begin
   statusCodeSize := Sizeof(DWORD);
   result := S_OK;
-  if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE + WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX,　@statusCode, statusCodeSize, WINHTTP_NO_HEADER_INDEX) then
+  if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE + WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, @statusCode, statusCodeSize, WINHTTP_NO_HEADER_INDEX) then
     result := GetLastError;
 end;
 
