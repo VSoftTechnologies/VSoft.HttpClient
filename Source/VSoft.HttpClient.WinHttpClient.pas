@@ -721,7 +721,7 @@ begin
         bufferSize := TRequestCracker(FCurrentRequest).GetContentLength;
         SetLength(buffer,bufferSize);
         ZeroMemory(@buffer[0], bufferSize);
-        {$IF CompilerVersion > 24.0} //XE4+
+        {$IF CompilerVersion > 25.0} //XE5+
         stream.ReadBuffer(buffer,0 , bufferSize);
         {$ELSE}
         stream.ReadBuffer(buffer, bufferSize);
