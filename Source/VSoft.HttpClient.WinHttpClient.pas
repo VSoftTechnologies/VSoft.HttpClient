@@ -17,7 +17,7 @@ uses
 
 
 type
-  THttpClient = class(TInterfacedObject, IHttpClient, IHttpClientInternal)
+  THttpClient = class(THttpClientBase, IHttpClient, IHttpClientInternal)
   private
     FUri : IUri;
 
@@ -92,7 +92,7 @@ type
 
     //IHttpClientInternal
     function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-    procedure ReleaseRequest(const request : TRequest);
+    procedure ReleaseRequest(const request : TRequest);override;
 
 
   public
@@ -104,6 +104,7 @@ type
 implementation
 
 uses
+  System.RTLConsts,
   System.Math,
   System.StrUtils;
 
@@ -208,10 +209,7 @@ var
   i : integer;
 begin
   FWaitEvent.SetEvent;
-  FWaitEvent.Free;
 
-  if FSession <> nil then
-    WinHttpCloseHandle(FSession);
   if FRequests.Count > 0 then
   begin
     //reverse order as they remove themselves from the list.
@@ -219,6 +217,10 @@ begin
       FRequests[i].Free;
   end;
   FRequests.Free;
+  if FSession <> nil then
+    WinHttpCloseHandle(FSession);
+  FWaitEvent.Free;
+
   inherited;
 end;
 
@@ -578,18 +580,19 @@ begin
 end;
 
 function THttpClient.ReadData(hRequest: HINTERNET; dataSize : DWORD): boolean;
-var
-  bufferSize : DWORD;
+//var
+//  bufferSize : DWORD;
 begin
-  bufferSize := Min(dataSize + 2, cReceiveBufferSize);
-  ZeroMemory(@FReceiveBuffer[0], bufferSize);
-  result := WinHttpReadData(hRequest, FReceiveBuffer[0], bufferSize , @FLastReceiveBlockSize);
+//  bufferSize := Min(dataSize + 2, cReceiveBufferSize);
+  ZeroMemory(@FReceiveBuffer[0], cReceiveBufferSize);
+  result := WinHttpReadData(hRequest, FReceiveBuffer[0], cReceiveBufferSize , @FLastReceiveBlockSize);
 end;
 
 
 procedure THttpClient.ReleaseRequest(const request: TRequest);
 begin
-  FRequests.Remove(request);
+  if FRequests.Contains(request) then
+    FRequests.Remove(request);
 end;
 
 
@@ -718,7 +721,11 @@ begin
         bufferSize := TRequestCracker(FCurrentRequest).GetContentLength;
         SetLength(buffer,bufferSize);
         ZeroMemory(@buffer[0], bufferSize);
+        {$IF CompilerVersion > 23} //XE3+
         stream.ReadBuffer(buffer,0 , bufferSize);
+        {$ELSE}
+        stream.ReadBuffer(buffer, bufferSize);
+        {$IFEND}
         FData := @buffer[0];
         FBytesWritten := FDataLength;
       end
@@ -823,6 +830,34 @@ begin
   raise ENotImplemented.Create('Serialization not implemented yet');
 end;
 
+function StreamReadBuffer(const stream : TStream; var Buffer: TBytes; Offset, Count: integer) : integer;
+var
+  LTotalCount,
+  LReadCount: integer;
+begin
+  { Perform a read directly. Most of the time this will succeed
+    without the need to go into the WHILE loop. }
+  stream.Seek(Offset, soFromBeginning);
+  LTotalCount := Stream.Read(Buffer, Count);
+  { Check if there was an error }
+  if LTotalCount < 0 then
+    raise EReadError.CreateRes(@SReadError) at ReturnAddress;;
+
+  while (LTotalCount < Count) do
+  begin
+    { Try to read a contiguous block of <Count> size }
+    LReadCount := StreamReadBuffer(stream, Buffer, Offset + LTotalCount, (Count - LTotalCount));
+
+    { Check if we read something and decrease the number of bytes left to read }
+    if LReadCount <= 0 then
+      raise EReadError.CreateRes(@SReadError) at ReturnAddress
+    else
+      Inc(LTotalCount, LReadCount);
+  end;
+  result := LTotalCount;
+end;
+
+
 function THttpClient.WriteData(hRequest: HINTERNET; position : DWORD): boolean;
 var
   stream : TStream;
@@ -839,7 +874,8 @@ begin
 
   SetLength(buffer,bufferSize + 2);
   ZeroMemory(@buffer[0], bufferSize);
-  stream.ReadBuffer(buffer, position, bufferSize);
+
+  streamReadBuffer(stream, buffer, position, bufferSize);
 
   result := WinHttpWriteData(hRequest, buffer, bufferSize, nil);
 

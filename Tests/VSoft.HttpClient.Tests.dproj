@@ -11,7 +11,7 @@
         <AppType>Console</AppType>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>10.4</DPMCompiler>
+        <DPMCompiler>XE2</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
         <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\Gabr42.OmniThreadLibrary\3.7.8\lib;$(DPM)\VSoft.Uri\0.3.0\src;$(DPM)\VSoft.DUnitX\0.1.0\src;$(DPM)\VSoft.CancellationToken\0.0.4\lib;$(DPM)\VSoft.Awaitable\0.1.0\src;</DPMSearch>

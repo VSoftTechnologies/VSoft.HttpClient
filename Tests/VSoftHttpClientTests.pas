@@ -68,9 +68,7 @@ var
   client : IHttpClient;
   response : IHttpResponse;
   request : TRequest;
-  i : integer;
   cancelTokenSource : ICancellationTokenSource;
-  jsonObj : TJsonObject;
 begin
   exit;
   cancelTokenSource := TCancellationTokenSourceFactory.Create;
@@ -100,9 +98,7 @@ var
   client : IHttpClient;
   response : IHttpResponse;
   request : TRequest;
-  i : integer;
   cancelTokenSource : ICancellationTokenSource;
-  jsonObj : TJsonObject;
 begin
   cancelTokenSource := TCancellationTokenSourceFactory.Create;
 
@@ -124,10 +120,10 @@ begin
 end;
 
 procedure TMyTestObject.TestUploadFiles;
-var
-  client : IHttpClient;
-  response : IHttpResponse;
-  i : integer;
+//var
+//  client : IHttpClient;
+//  response : IHttpResponse;
+//  i : integer;
 begin
 //  client := THttpClientFactory.CreateClient('http://localhost:55542');
 //  request := THttpClientFactory.CreateRequest('weatherforecast/upload');
