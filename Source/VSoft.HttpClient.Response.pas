@@ -361,7 +361,7 @@ procedure THttpResponse.WriteBuffer(const buffer: TBytes; const length : NativeI
 begin
   if FStream = nil then
     exit;
-  {$IF CompilerVersion > 23}
+  {$IF CompilerVersion > 23.0} //XE3+
     FStream.WriteData(buffer, length);
   {$ELSE}
     FStream.WriteBuffer(buffer, length);

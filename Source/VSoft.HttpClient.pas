@@ -587,7 +587,7 @@ end;
 function TRequest.GetCharSet: string;
 begin
   if FEncoding <> nil then
-  {$If CompilerVersion > 33}
+  {$If CompilerVersion > 33.0} //10.4+
     result := FEncoding.MIMEName
   {$ELSE}
     result := FEncoding.EncodingName

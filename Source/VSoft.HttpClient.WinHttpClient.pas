@@ -92,12 +92,12 @@ type
 
     //IHttpClientInternal
     function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-    procedure ReleaseRequest(const request : TRequest);override;
 
 
   public
     constructor Create(const uri : IUri);
     destructor Destroy;override;
+    procedure ReleaseRequest(const request : TRequest);override;
   end;
 
 
@@ -721,7 +721,7 @@ begin
         bufferSize := TRequestCracker(FCurrentRequest).GetContentLength;
         SetLength(buffer,bufferSize);
         ZeroMemory(@buffer[0], bufferSize);
-        {$IF CompilerVersion > 23} //XE3+
+        {$IF CompilerVersion > 24.0} //XE4+
         stream.ReadBuffer(buffer,0 , bufferSize);
         {$ELSE}
         stream.ReadBuffer(buffer, bufferSize);
