@@ -42,6 +42,7 @@ type
     FData : Pointer;
     FDataLength : DWORD;
 
+
   protected
     procedure OnHTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
     function OnHeadersAvailable(hRequest: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD) : DWORD;
@@ -77,6 +78,16 @@ type
 
     function GetUseHttp2 : boolean;
     procedure SetUseHttp2(const value : boolean);
+
+    function GetConnectionTimeout : integer;
+    procedure SetConnectionTimeout(const value : integer);
+
+    function GetSendTimeout : integer;
+    procedure SetSendTimeout(const value : integer);
+
+    function GetResponseTimeout : integer;
+    procedure SetResponseTimeout(const value : integer);
+
 
 
     function CreateRequest(const resource : string) : TRequest;overload;
@@ -248,6 +259,11 @@ begin
 end;
 
 
+function THttpClient.GetConnectionTimeout: integer;
+begin
+  result := FConnectionTimeout;
+end;
+
 function THttpClient.GetPassword: string;
 begin
   result := FPassword;
@@ -280,6 +296,16 @@ begin
       result := result + request.Parameters.Names[i] + '=' + request.Parameters.ValueFromIndex[i];
     end;
   end;
+end;
+
+function THttpClient.GetResponseTimeout: integer;
+begin
+  result := FResponseTimeout;
+end;
+
+function THttpClient.GetSendTimeout: integer;
+begin
+  result := FSendTimeout;
 end;
 
 function THttpClient.GetUri: IUri;
@@ -694,6 +720,13 @@ begin
       FClientError := GetLastError;
       raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
     end;
+
+    if WinHttpSetTimeouts(hRequest, request.ConnectionTimeout, request.ConnectionTimeout, request.SendTimeout, request.ResponseTimeout) = False then
+      raise EHttpClientException.Create(SysErrorMessage(GetLastError), GetLastError);
+
+
+    //set timeouts on the request.
+
     try
       pCallback := WinHttpSetStatusCallback(hRequest, _HTTPCallback, WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS + WINHTTP_CALLBACK_FLAG_REDIRECT, 0);
 
@@ -799,9 +832,24 @@ begin
   FUri.BaseUriString := value;
 end;
 
+procedure THttpClient.SetConnectionTimeout(const value: integer);
+begin
+  FConnectionTimeout := value;
+end;
+
 procedure THttpClient.SetPassword(const value: string);
 begin
   FPassword := value;
+end;
+
+procedure THttpClient.SetResponseTimeout(const value: integer);
+begin
+  FResponseTimeout := value;
+end;
+
+procedure THttpClient.SetSendTimeout(const value: integer);
+begin
+  FSendTimeout := value;
 end;
 
 procedure THttpClient.SetUseHttp2(const value: boolean);

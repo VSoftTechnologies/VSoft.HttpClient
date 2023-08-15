@@ -153,12 +153,10 @@ var
 begin
   cancelTokenSource := TCancellationTokenSourceFactory.Create;
   uri := TUriFactory.Parse('https://www.finalbuilder.com');
-  client := THttpClientFactory.CreateClient('https://www.finalbuilder.com');
-  request := client.CreateRequest('/DesktopModules/LiveBlog/API/Syndication/GetRssFeeds?mid=632&PortalId=0&tid=181&ItemCount=20&LimitWords=20');
+  client := THttpClientFactory.CreateClient(uri);
+  request := client.CreateRequest('/DesktopModules/LiveBlog/API/Syndication/GetRssFeeds?mid=632&PortalId=0&tid=181&ItemCount=2000&LimitWords=20000');
   response := request.Get(cancelTokenSource.Token);
   Assert.AreEqual<integer>(200, response.StatusCode);
-
-
 end;
 
 initialization

@@ -73,8 +73,15 @@ type
   end;
 
   THttpClientBase = class(TInterfacedObject)
+  protected
+    FConnectionTimeout: Integer;
+    FSendTimeout: Integer;
+    FResponseTimeout: Integer;
   public
     procedure ReleaseRequest(const request : TRequest);virtual;abstract;
+    property ConnectionTimeout: Integer read FConnectionTimeout write FConnectionTimeout;
+    property SendTimeout: Integer read FSendTimeout write FSendTimeout;
+    property ResponseTimeout: Integer read FResponseTimeout write FResponseTimeout;
   end;
 
 
@@ -96,6 +103,10 @@ type
     FPassword : string;
     FProxyUserName : string;
     FProxyPassword : string;
+
+    FConnectionTimeout: Integer;
+    FSendTimeout: Integer;
+    FResponseTimeout: Integer;
 
     FURI : IUri;
   protected
@@ -203,6 +214,11 @@ type
     property Passsword : string read FPassword write FPassword;
     property ProxyUserName : string read FProxyUserName write FProxyUserName;
     property ProxyPassword : string read FProxyPassword write FProxyPassword;
+
+    property ConnectionTimeout: Integer read FConnectionTimeout write FConnectionTimeout;
+    property SendTimeout: Integer read FSendTimeout write FSendTimeout;
+    property ResponseTimeout: Integer read FResponseTimeout write FResponseTimeout;
+
   end;
 
 
@@ -233,6 +249,15 @@ type
     function GetPassword : string;
     procedure SetPassword(const value : string);
 
+    function GetConnectionTimeout : integer;
+    procedure SetConnectionTimeout(const value : integer);
+
+    function GetSendTimeout : integer;
+    procedure SetSendTimeout(const value : integer);
+
+    function GetResponseTimeout : integer;
+    procedure SetResponseTimeout(const value : integer);
+
     function CreateRequest(const resource : string) : TRequest;overload;
     function CreateRequest(const uri : IUri) : TRequest;overload;
 
@@ -246,13 +271,31 @@ type
     property UserName   : string read GetUserName write SetUserName;
     property Password   : string read GetPassword write SetPassword;
 
+    property ConnectionTimeout: Integer read GetConnectionTimeout write SetConnectionTimeout;
+    property SendTimeout: Integer read GetSendTimeout write SetSendTimeout;
+    property ResponseTimeout: Integer read GetResponseTimeout write SetResponseTimeout;
+
+
     property UseHttp2   : boolean read GetUseHttp2 write SetUseHttp2;
+
+
   end;
 
   THttpClientFactory = class
-   class function CreateClient(const uri: string): IHttpClient;overload;
-   class function CreateClient(const uri: IUri): IHttpClient;overload;
+  private
+   class
+    var
+      FDefaultConnectionTimeout: Integer;
+      FDefaultSendTimeout: Integer;
+      FDefaultResponseTimeout: Integer;
+    class constructor Create;
+  public
+    class function CreateClient(const uri: string): IHttpClient;overload;
+    class function CreateClient(const uri: IUri): IHttpClient;overload;
 
+    class property DefaultConnectionTimeout: Integer read FDefaultConnectionTimeout write FDefaultConnectionTimeout;
+    class property DefaultSendTimeout: Integer read FDefaultSendTimeout write FDefaultSendTimeout;
+    class property DefaultResponseTimeout: Integer read FDefaultResponseTimeout write FDefaultResponseTimeout;
   end;
 
   EHttpClientException = class(Exception)
@@ -402,6 +445,9 @@ begin
     for queryParam in uri.QueryParams do
       WithParameter(queryParam.Name, queryParam.Value);
   end;
+  FConnectionTimeout := client.ConnectionTimeout;
+  FSendTimeout := client.SendTimeout;
+  FResponseTimeout := client.ResponseTimeout;
 end;
 
 function CombineUriParts(const a, b : string) : string;
@@ -596,6 +642,7 @@ begin
     result := '';
 end;
 
+
 function TRequest.GetContentLength: Int64;
 var
   stream : TStream;
@@ -626,6 +673,7 @@ function TRequest.GetResource: string;
 begin
   result := FURI.AbsolutePath;
 end;
+
 
 function TRequest.GetUrlSegments: TStrings;
 begin
@@ -776,6 +824,7 @@ begin
   FHeaders.Values[cAcceptLanguageHeader] := value;
 end;
 
+
 procedure TRequest.SetContentType(const value: string);
 begin
   FHeaders.Values[cContentTypeHeader] := value;
@@ -785,6 +834,7 @@ procedure TRequest.SetResource(const value: string);
 begin
  FURI.Path := value;
 end;
+
 
 
 function TRequest.WillFollowRedirects: TRequest;
@@ -907,13 +957,23 @@ var
 begin
   if not TUriFactory.TryParseWithError(uri, true, theUri, error)  then
     raise EArgumentOutOfRangeException.Create('Invalid Uri : ' + error );
+  result := THttpClientFactory.CreateClient(theUri);
+end;
 
-  result := THttpClient.Create(theUri);
+class constructor THttpClientFactory.Create;
+begin
+  //1min defaults
+  FDefaultConnectionTimeout := 60000;
+  FDefaultSendTimeout := 60000;
+  FDefaultResponseTimeout := 60000;
 end;
 
 class function THttpClientFactory.CreateClient(const uri: IUri): IHttpClient;
 begin
   result := THttpClient.Create(uri);
+  result.ConnectionTimeout := FDefaultConnectionTimeout;
+  result.SendTimeout := FDefaultSendTimeout;
+  result.ResponseTimeout := FDefaultResponseTimeout;
 end;
 
 { EHttpClientException }

@@ -37,3 +37,4 @@ __history
 /Tests/Win64
 /Tests/OSX32
 /Tests/__history
+*.delphilsp.json
