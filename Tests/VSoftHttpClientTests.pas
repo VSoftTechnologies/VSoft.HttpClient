@@ -152,10 +152,13 @@ var
   cancelTokenSource : ICancellationTokenSource;
 begin
   cancelTokenSource := TCancellationTokenSourceFactory.Create;
-  uri := TUriFactory.Parse('https://www.finalbuilder.com');
+  uri := TUriFactory.Parse('https://delphi.dev');
   client := THttpClientFactory.CreateClient(uri);
-  request := client.CreateRequest('/DesktopModules/LiveBlog/API/Syndication/GetRssFeeds?mid=632&PortalId=0&tid=181&ItemCount=2000&LimitWords=20000');
-  response := request.Get(cancelTokenSource.Token);
+  request := client.CreateRequest('/api/v1/searchbyids')
+    .WithBody('{"compiler": "XE7","platform": "Win32","packageids": [{"id": "Spring4D.Data","version": "2.0.0-rc.2"},{"id": "Spring4D.Base","version": "2.0.0-rc.2"}]}', TEncoding.UTF8)
+    .WithContentType('application/json', 'utf-8');
+
+  response := request.Post(cancelTokenSource.Token);
   Assert.AreEqual<integer>(200, response.StatusCode);
 end;
 
