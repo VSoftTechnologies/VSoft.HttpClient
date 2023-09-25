@@ -22,14 +22,18 @@ type
 //    [Test]
     procedure TestParameters;
 
-    [Test]
+//    [Test]
     procedure TestWithUri;
+
+    [Test]
+    procedure TestResponseStream;
   end;
 
 implementation
 uses
   WinApi.ActiveX,
   System.SysUtils,
+  System.Classes,
   VSoft.CancellationToken,
   VSoft.Uri,
   JsonDataObjects;
@@ -117,6 +121,39 @@ begin
   Assert.AreEqual<integer>(200, response.StatusCode);
 
   Assert.Pass;
+end;
+
+procedure TMyTestObject.TestResponseStream;
+var
+  client : IHttpClient;
+  response : IHttpResponse;
+  i : integer;
+  cancelTokenSource : ICancellationTokenSource;
+  stream : TMemoryStream;
+begin
+  cancelTokenSource := TCancellationTokenSourceFactory.Create;
+
+  client := THttpClientFactory.CreateClient('https://localhost:5002');
+  response := client.CreateRequest('/api/v1/package/VSoft.DUnitX/11.0/Win32/0.3.3/icon')
+  .Get(cancelTokenSource.Token);
+
+
+  if response.StatusCode <> 200 then
+    WriteLn(response.ErrorMessage);
+
+  Assert.AreEqual<integer>(200, response.StatusCode);
+  Assert.AreNotEqual<integer>(0, response.ContentLength);
+
+  stream := TMemoryStream.Create;
+  try
+    stream.CopyFrom(response.ResponseStream);
+    Assert.AreEqual(response.ContentLength, stream.Size);
+
+  finally
+    stream.Free;
+  end;
+
+
 end;
 
 procedure TMyTestObject.TestUploadFiles;

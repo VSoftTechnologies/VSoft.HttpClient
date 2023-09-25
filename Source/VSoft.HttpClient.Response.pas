@@ -128,7 +128,9 @@ end;
 procedure THttpResponse.FinalizeContent;
 begin
   if FStream is TFileStream then
-    FreeAndNil(FStream);
+    FreeAndNil(FStream)
+  else
+    FStream.Seek(0,soBeginning);
 end;
 
 function THttpResponse.GetContentDisposition: IContentDisposition;
@@ -199,6 +201,7 @@ end;
 
 function THttpResponse.GetResponseStream: TStream;
 begin
+
   result := FStream;
 end;
 
