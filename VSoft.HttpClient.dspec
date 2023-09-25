@@ -1,10 +1,11 @@
 {
    "metadata":{
       "id":"VSoft.HttpClient",
-      "version":"0.10.4-beta.2",
+      "version":"0.10.4-beta.3",
       "description":"WinHttp base http client",
       "authors":"Vincent Parrett",
       "projectUrl":"https://github.com/VSoftTechnologies/VSoft.HttpClient",
+      "repositoryUrl":"https://github.com/VSoftTechnologies/VSoft.HttpClient",
       "license":"Apache-2.0",
       "copyright":"Vincent Parrett and contributors",
       "tags":"http client winhttp"
