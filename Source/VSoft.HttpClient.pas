@@ -243,6 +243,10 @@ type
     function GetUseHttp2 : boolean;
     procedure SetUseHttp2(const value : boolean);
 
+    function GetEnableTLS1_3 : boolean;
+    procedure SetEnableTLS1_3(const value : boolean);
+
+
     function GetUserName : string;
     procedure SetUserName(const value : string);
 
@@ -277,7 +281,7 @@ type
 
 
     property UseHttp2   : boolean read GetUseHttp2 write SetUseHttp2;
-
+    property EnableTLS1_3 : boolean read GetEnableTLS1_3 write SetEnableTLS1_3;
 
   end;
 
@@ -309,7 +313,7 @@ type
 
   function HttpMethodToString(const value : THttpMethod) : string;
 
-  function ClientErrorToString(const value : HRESULT) : string;
+  function ClientErrorToString(const message : string; const value : HRESULT) : string;
 
 const
   cAcceptHeader = 'Accept';
@@ -333,7 +337,7 @@ uses
   VSoft.HttpClient.WinHttpClient,
   VSoft.HttpClient.MultipartFormData;
 
-function ClientErrorToString(const value : HRESULT) : string;
+function ClientErrorToString(const message : string; const value : HRESULT) : string;
 begin
   case value of
     ERROR_WINHTTP_OUT_OF_HANDLES : result := 'Out of handles.';
@@ -407,9 +411,10 @@ begin
 
     E_UNEXPECTED : result := 'Unexpected value';
   else
-    result := 'Unknown Error';
+    result := 'Unknown Error 0x' + IntToHex(value,8);
   end;
 
+  result := message + ': ' + result;
 
 end;
 

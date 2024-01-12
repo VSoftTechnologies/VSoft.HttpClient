@@ -35,6 +35,7 @@ type
     FBytesWritten : DWORD;
     FClientError : DWORD;
     FUseHttp2 : boolean;
+    FEnableTLS1_3 : boolean;
     FAllowSelfSignedCertificates : boolean;
     FLastStatusCode : DWORD;
     FProxyAuthScheme : DWORD;
@@ -78,6 +79,9 @@ type
 
     function GetUseHttp2 : boolean;
     procedure SetUseHttp2(const value : boolean);
+    function GetEnableTLS1_3 : boolean;
+    procedure SetEnableTLS1_3(const value : boolean);
+
 
     function GetConnectionTimeout : integer;
     procedure SetConnectionTimeout(const value : integer);
@@ -211,6 +215,7 @@ begin
   FUri := uri;
   FUserAgent := 'VSoft.HttpClient';
   FWaitEvent := TEvent.Create(nil,false, false,'');
+  FEnableTLS1_3 := false;
 end;
 
 
@@ -262,6 +267,11 @@ end;
 function THttpClient.GetConnectionTimeout: integer;
 begin
   result := FConnectionTimeout;
+end;
+
+function THttpClient.GetEnableTLS1_3: boolean;
+begin
+  result := FEnableTLS1_3;
 end;
 
 function THttpClient.GetPassword: string;
@@ -626,7 +636,6 @@ const http_version = 'HTTP/2';
 
 const WAIT_OBJECT_1 = WAIT_OBJECT_0 + 1;
 
-const tlsProtocols : DWORD =  WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2 + WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
 
 
 //simple get/post etc.
@@ -651,6 +660,9 @@ var
 
   sResource : string;
   hr : DWORD;
+  tlsProtocols : DWORD;
+
+
 begin
   if FCurrentRequest <> nil then
     raise Exception.Create('A request is in progress.. winhttp is not reentrant!');
@@ -663,11 +675,14 @@ begin
     FBytesWritten := 0;
     FCurrentRequest := request;
     EnsureSession;
+    tlsProtocols := WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_2;
+    if FEnableTLS1_3 then
+      tlsProtocols := tlsProtocols + WINHTTP_FLAG_SECURE_PROTOCOL_TLS1_3;
 
     if not WinHttpSetOption(FSession, WINHTTP_OPTION_SECURE_PROTOCOLS, @tlsProtocols, sizeof(tlsProtocols)) then
     begin
       FClientError := GetLastError;
-      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+      raise EHttpClientException.Create(ClientErrorToString('Error setting secure protocol options',FClientError), FClientError);
     end;
 
 
@@ -684,7 +699,7 @@ begin
     if not WinHttpCrackUrl(PWideChar(FUri.BaseUriString), 0, 0, urlComp ) then
     begin
       FClientError := GetLastError;
-      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+      raise EHttpClientException.Create(ClientErrorToString('Error parsing Uri', FClientError), FClientError);
     end;
 
     SetString(host, urlComp.lpszHostName, urlComp.dwHostNameLength);
@@ -693,7 +708,7 @@ begin
     if hConnection = nil then
     begin
       FClientError := GetLastError;
-      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+      raise EHttpClientException.Create(ClientErrorToString('Error connecting', FClientError), FClientError);
     end;
 
     option := 0;
@@ -703,7 +718,7 @@ begin
     if not WinHttpSetOption(hConnection,WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, @option, SizeOf(DWORD)) then
     begin
       FClientError := GetLastError;
-      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+      raise EHttpClientException.Create(ClientErrorToString('Error setting http options', FClientError), FClientError);
     end;
 
     dwOpenRequestFlags := WINHTTP_FLAG_REFRESH + WINHTTP_FLAG_ESCAPE_PERCENT;
@@ -718,7 +733,7 @@ begin
     if hRequest = nil then
     begin
       FClientError := GetLastError;
-      raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+      raise EHttpClientException.Create(ClientErrorToString('Error opening request', FClientError), FClientError);
     end;
 
     if WinHttpSetTimeouts(hRequest, request.ConnectionTimeout, request.ConnectionTimeout, request.SendTimeout, request.ResponseTimeout) = False then
@@ -783,7 +798,7 @@ begin
           //if all is ok, then return the response.
           if FClientError <> 0 then
           begin
-            raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+            raise EHttpClientException.Create(ClientErrorToString('',FClientError), FClientError);
             //raise exception?
           end;
 
@@ -793,7 +808,7 @@ begin
         WAIT_OBJECT_1 :
         begin
           //cancellation token triggered
-            raise EHttpClientException.Create(ClientErrorToString(FClientError), FClientError);
+            raise EHttpClientException.Create(ClientErrorToString('',FClientError), FClientError);
 
           FResponse := nil;
           exit;
@@ -801,7 +816,7 @@ begin
         WAIT_TIMEOUT :
         begin
           //timed out, clean up and return.
-          raise EHttpClientException.Create(ClientErrorToString(ERROR_WINHTTP_TIMEOUT), ERROR_WINHTTP_TIMEOUT);
+          raise EHttpClientException.Create(ClientErrorToString('Timed out',ERROR_WINHTTP_TIMEOUT), ERROR_WINHTTP_TIMEOUT);
           FResponse := nil;
           exit;
         end;
@@ -835,6 +850,11 @@ end;
 procedure THttpClient.SetConnectionTimeout(const value: integer);
 begin
   FConnectionTimeout := value;
+end;
+
+procedure THttpClient.SetEnableTLS1_3(const value: boolean);
+begin
+  FEnableTLS1_3 := false;
 end;
 
 procedure THttpClient.SetPassword(const value: string);

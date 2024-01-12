@@ -1,0 +1,44 @@
+package VSoft.HttpClientR;
+
+{$R *.res}
+{$IFDEF IMPLICITBUILDING This IFDEF should not be used by users}
+{$ALIGN 8}
+{$ASSERTIONS ON}
+{$BOOLEVAL OFF}
+{$DEBUGINFO OFF}
+{$EXTENDEDSYNTAX ON}
+{$IMPORTEDDATA ON}
+{$IOCHECKS ON}
+{$LOCALSYMBOLS ON}
+{$LONGSTRINGS ON}
+{$OPENSTRINGS ON}
+{$OPTIMIZATION OFF}
+{$OVERFLOWCHECKS OFF}
+{$RANGECHECKS OFF}
+{$REFERENCEINFO ON}
+{$SAFEDIVIDE OFF}
+{$STACKFRAMES ON}
+{$TYPEDADDRESS OFF}
+{$VARSTRINGCHECKS ON}
+{$WRITEABLECONST OFF}
+{$MINENUMSIZE 1}
+{$IMAGEBASE $400000}
+{$DEFINE DEBUG}
+{$ENDIF IMPLICITBUILDING}
+{$DESCRIPTION 'VSoftHttpClient runtime for 10.4'}
+{$LIBSUFFIX AUTO}
+{$RUNONLY}
+{$IMPLICITBUILD OFF}
+
+requires
+  rtl;
+
+contains
+  VSoft.HttpClient.Headers in '..\..\Source\VSoft.HttpClient.Headers.pas',
+  VSoft.HttpClient.MultipartFormData in '..\..\Source\VSoft.HttpClient.MultipartFormData.pas',
+  VSoft.HttpClient in '..\..\Source\VSoft.HttpClient.pas',
+  VSoft.HttpClient.Response in '..\..\Source\VSoft.HttpClient.Response.pas',
+  VSoft.HttpClient.WinHttpClient in '..\..\Source\VSoft.HttpClient.WinHttpClient.pas',
+  VSoft.WinHttp.Api in '..\..\Source\VSoft.WinHttp.Api.pas';
+
+end.

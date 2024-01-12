@@ -1,7 +1,7 @@
 {
    "metadata":{
       "id":"VSoft.HttpClient",
-      "version":"0.10.4-beta.3",
+      "version":"0.11.0-beta.10",
       "description":"WinHttp base http client",
       "authors":"Vincent Parrett",
       "projectUrl":"https://github.com/VSoftTechnologies/VSoft.HttpClient",
@@ -75,6 +75,11 @@
          "compiler":"11.0",
          "platforms":"Win32, Win64",
          "template":"default"
+      },
+      {
+         "compiler":"12.0",
+         "platforms":"Win32, Win64",
+         "template":"12+"
       }
    ],
    "templates":[
@@ -83,7 +88,7 @@
          "dependencies":[
             {
                "id":"VSoft.CancellationToken",
-               "version":"[0.1.1,]"
+               "version":"[0.1.2,]"
             },
             {
                "id":"VSoft.Uri",
@@ -123,6 +128,52 @@
            "copyLocal" : true
          }
         ]       
-      }
+      },
+      {
+		 "name":"12+",
+		 "dependencies":[
+			{
+			   "id":"VSoft.CancellationToken",
+			   "version":"[0.1.2,]"
+			},
+			{
+			   "id":"VSoft.Uri",
+			   "version":"[0.3.2,]"
+			}			
+		 ],
+		 "source":[
+			{
+			   "src":"source\\*.pas",
+			   "flatten":true,
+			   "dest":"source"
+			},
+			{
+			  "src": "packages\\Rad Studio $compilerNoPoint$\\*.dpk",
+			  "dest": "packages\\Rad Studio $compilerNoPoint$"
+			},
+			{
+			  "src": "packages\\Rad Studio $compilerNoPoint$\\*.dproj",
+			  "dest": "packages\\Rad Studio $compilerNoPoint$"
+			}
+		 ],
+		 "searchPaths":[
+			{
+			   "path":"source"
+			}
+		 ],
+		"build": [
+		  {
+			"id": "Runtime",
+			"project": ".\\packages\\Rad Studio $compilerNoPoint$\\VSoft.HttpClientR.dproj"
+		  }
+		],
+		"runtime" : [
+		 {
+		   "buildId" : "Runtime",
+		   "src" : "bin\\VSoft.HttpClientR$LibSuffix$.bpl",
+		   "copyLocal" : true
+		 }
+		]       
+	  }
    ]
 }

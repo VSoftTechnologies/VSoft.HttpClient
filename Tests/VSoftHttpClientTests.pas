@@ -146,7 +146,7 @@ begin
 
   stream := TMemoryStream.Create;
   try
-    stream.CopyFrom(response.ResponseStream);
+    stream.CopyFrom(response.ResponseStream,response.ResponseStream.Size);
     Assert.AreEqual(response.ContentLength, stream.Size);
 
   finally

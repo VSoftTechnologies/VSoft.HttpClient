@@ -11,11 +11,11 @@
         <AppType>Console</AppType>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>11.0</DPMCompiler>
+        <DPMCompiler>XE2</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.0\lib;$(DPM)\VSoft.Uri\0.3.0\src;$(DPM)\VSoft.DUnitX\0.3.1\src;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.CancellationToken\0.1.0\lib;$(DPM)\VSoft.Uri\0.3.0\src;$(DPM)\VSoft.DUnitX\0.3.1\src;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.3.0\src;$(DPM)\VSoft.DUnitX\0.3.1\src;$(DPM)\VSoft.CancellationToken\0.1.0\lib;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.Uri\0.3.0\src;$(DPM)\VSoft.DUnitX\0.3.1\src;$(DPM)\VSoft.CancellationToken\0.1.0\lib;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
