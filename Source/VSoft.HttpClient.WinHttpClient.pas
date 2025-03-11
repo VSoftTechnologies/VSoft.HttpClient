@@ -163,18 +163,39 @@ end;
 
 function THttpClient.ChooseAuth(dwSupportedSchemes: DWORD): DWORD;
 begin
-  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NEGOTIATE > 0 then
-    exit(WINHTTP_AUTH_SCHEME_NEGOTIATE);
-  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NTLM > 0 then
-    exit(WINHTTP_AUTH_SCHEME_NTLM);
-  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_PASSPORT > 0 then
-    exit(WINHTTP_AUTH_SCHEME_PASSPORT);
-  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_DIGEST > 0 then
-    exit(WINHTTP_AUTH_SCHEME_DIGEST);
-  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_BASIC > 0 then
-    exit(WINHTTP_AUTH_SCHEME_BASIC);
+  result := 0; //none
 
-  result := 0;
+  case FAuthTyp of
+    None: exit;
+    Basic:
+    begin
+      if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_BASIC > 0 then
+        exit(WINHTTP_AUTH_SCHEME_BASIC);
+    end;
+    THttpAuthType.NegotiateOrNtlm:
+    begin
+      if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NEGOTIATE > 0 then
+        exit(WINHTTP_AUTH_SCHEME_NEGOTIATE);
+      //fall back to ntlm if supported.
+      if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NTLM > 0 then
+        exit(WINHTTP_AUTH_SCHEME_NTLM);
+    end;
+  end;
+
+  //TODO : can we log an error here?
+
+//  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NEGOTIATE > 0 then
+//    exit(WINHTTP_AUTH_SCHEME_NEGOTIATE);
+//  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NTLM > 0 then
+//    exit(WINHTTP_AUTH_SCHEME_NTLM);
+//  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_PASSPORT > 0 then
+//    exit(WINHTTP_AUTH_SCHEME_PASSPORT);
+//  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_DIGEST > 0 then
+//    exit(WINHTTP_AUTH_SCHEME_DIGEST);
+//  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_BASIC > 0 then
+//    exit(WINHTTP_AUTH_SCHEME_BASIC);
+//
+//  result := 0;
 
 end;
 

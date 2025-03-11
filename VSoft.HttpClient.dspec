@@ -1,7 +1,7 @@
 {
    "metadata":{
       "id":"VSoft.HttpClient",
-      "version":"0.2.0",
+      "version":"1.0.1",
       "description":"WinHttp base http client",
       "authors":"Vincent Parrett",
       "projectUrl":"https://github.com/VSoftTechnologies/VSoft.HttpClient",
