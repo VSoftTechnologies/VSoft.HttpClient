@@ -127,7 +127,6 @@ procedure TMyTestObject.TestResponseStream;
 var
   client : IHttpClient;
   response : IHttpResponse;
-  i : integer;
   cancelTokenSource : ICancellationTokenSource;
   stream : TMemoryStream;
 begin

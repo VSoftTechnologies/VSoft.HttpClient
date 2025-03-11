@@ -106,7 +106,7 @@ type
 
 
     //IHttpClientInternal
-    function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
+    function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
 
 
   public
@@ -830,6 +830,7 @@ begin
     SetLength(FReceiveBuffer, 0);
   end;
 end;
+
 
 
 procedure THttpClient.SetAllowSelfSignedCertificates(const value: boolean);

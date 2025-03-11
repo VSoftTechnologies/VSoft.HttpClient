@@ -10,6 +10,19 @@ uses
   VSoft.Uri;
 
 
+{$IFDEF CONDITIONALEXPRESSIONS}  //Started being defined with D2009
+   {$IF CompilerVersion < 23.0} // Before RAD Studio XE2
+      {$DEFINE UNSUPPORTED_COMPILER_VERSION}
+   {$IFEND}
+  {$IF CompilerVersion > 24.0 } //XE4 or later
+    {$LEGACYIFEND ON}
+  {$IFEND}
+{$ELSE}
+  {$DEFINE UNSUPPORTED_COMPILER_VERSION}
+{$ENDIF}
+
+
+
 type
   THttpAuthType = (None, Basic);
   THttpMethod = (GET,POST, PUT, PATCH, DELETE);
@@ -176,24 +189,25 @@ type
 
     function ForceFormData(const value : boolean = true) : TRequest;
 
+    //Note - ideally these methods would be on the client - but non gerneric interfaces cannot have generic methods.
     //execute
     function Get(const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-    function Get<T : class>(const cancellationToken : ICancellationToken = nil) : T;overload;
+//    function Get<T : class>(const cancellationToken : ICancellationToken = nil) : T;overload;
 
     function Post(const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-    function Post<T : class>(const entity : T; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-    function Post<T : class; R : class>(const entity : T; const cancellationToken : ICancellationToken = nil) : R;overload;
+//    function Post<T : class>(const entity : T; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
+//    function Post<T : class; R : class>(const entity : T; const cancellationToken : ICancellationToken = nil) : R;overload;
 
     function Patch(const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-    function Patch<T : class>(const entity : T ; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-    function Patch<T : class; R : class>(const entity : T; const cancellationToken : ICancellationToken = nil) : R;overload;
+//    function Patch<T : class>(const entity : T ; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
+//    function Patch<T : class; R : class>(const entity : T; const cancellationToken : ICancellationToken = nil) : R;overload;
 
     function Put(const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-    function Put<T : class>(const entity : T ; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-    function Put<T : class; R : class>(const entity : T; const cancellationToken : ICancellationToken = nil) : R;overload;
+//    function Put<T : class>(const entity : T ; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
+//    function Put<T : class; R : class>(const entity : T; const cancellationToken : ICancellationToken = nil) : R;overload;
 
     function Delete(const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
-    function Delete<T : class>(const entity : T; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
+//    function Delete<T : class>(const entity : T; const cancellationToken : ICancellationToken = nil) : IHttpResponse;overload;
 
     property Headers      : TStrings read GetHeaders;
     property Parameters   : TStrings read GetParameters;
@@ -206,7 +220,7 @@ type
     property ContentType    : string read GetContentType write SetContentType;
 
     property FollowRedirects : boolean read FFollowRedirects write FFollowRedirects;
-    property HtttpMethod : THttpMethod read FHttpMethod;
+    property HtttpMethod : THttpMethod read FHttpMethod write FHttpMethod;
     property Resource    : string read GetResource write SetResource;
     property ContentLength : Int64 read GetContentLength;
     property SaveAsFile  : string read FSaveAsFile write FSaveAsFile;
@@ -267,6 +281,8 @@ type
 
     procedure UseSerializer(const useFunc : TUseSerializerFunc);overload;
     procedure UseSerializer(const serializer : IRestSerializer);overload;
+
+    function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
 
     property AllowSelfSignedCertificates : boolean read GetAllowSelfSignedCertificates write SetAllowSelfSignedCertificates;
     property AuthType   : THttpAuthType read GetAuthType write SetAuthType;
@@ -500,18 +516,18 @@ begin
   result := lClient.Send(self, cancellationToken);
 end;
 
-function TRequest.Delete<T>(const entity : T; const cancellationToken: ICancellationToken): IHttpResponse;
-var
-  entityType : PTypeInfo;
-  lClient : IHttpClientInternal;
-begin
-  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
-  FHttpMethod := THttpMethod.DELETE;
-  entityType := TypeInfo(T);
-  //TODO : Serialize entity
-  lClient := GetClient;
-  result := lClient.Send(self,cancellationToken);
-end;
+//function TRequest.Delete<T>(const entity : T; const cancellationToken: ICancellationToken): IHttpResponse;
+//var
+//  entityType : PTypeInfo;
+//  lClient : IHttpClientInternal;
+//begin
+//  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
+//  FHttpMethod := THttpMethod.DELETE;
+//  entityType := TypeInfo(T);
+//  //TODO : Serialize entity
+//  lClient := GetClient;
+//  result := lClient.Send(self,cancellationToken);
+//end;
 
 destructor TRequest.Destroy;
 begin
@@ -542,21 +558,21 @@ begin
   result := lClient.Send(Self, cancellationToken);
 end;
 
-function TRequest.Get<T>(const cancellationToken: ICancellationToken): T;
-var
-  returnType : PTypeInfo;
-  response : IHttpResponse;
-  lClient : IHttpClientInternal;
-begin
-  raise ENotImplemented.Create('Deserialization not implemented yet');
-
-  FHttpMethod := THttpMethod.GET;
-  returnType := TypeInfo(T);
-  lClient := GetClient;
-  response := lClient.Send(self, cancellationToken);
-  //TODO : deserialized the response
-  result := nil
-end;
+//function TRequest.Get<T>(const cancellationToken: ICancellationToken): T;
+//var
+//  returnType : PTypeInfo;
+//  response : IHttpResponse;
+//  lClient : IHttpClientInternal;
+//begin
+//  raise ENotImplemented.Create('Deserialization not implemented yet');
+//
+//  FHttpMethod := THttpMethod.GET;
+//  returnType := TypeInfo(T);
+//  lClient := GetClient;
+//  response := lClient.Send(self, cancellationToken);
+//  //TODO : deserialized the response
+//  result := nil
+//end;
 
 function TRequest.GetAccept: string;
 begin
@@ -694,38 +710,38 @@ begin
   result := lClient.Send(self, cancellationToken);
 end;
 
-function TRequest.Patch<T, R>(const entity : T; const cancellationToken: ICancellationToken): R;
-var
-  entityType : PTypeInfo;
-  returnType : PTypeInfo;
-  response : IHttpResponse;
-  lClient : IHttpClientInternal;
-begin
-  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
-  FHttpMethod := THttpMethod.PATCH;
-  entityType := TypeInfo(T);
-  returnType := TypeInfo(R);
-  lClient := GetClient;
-  response := lClient.Send(Self, cancellationToken);
+//function TRequest.Patch<T, R>(const entity : T; const cancellationToken: ICancellationToken): R;
+//var
+//  entityType : PTypeInfo;
+//  returnType : PTypeInfo;
+//  response : IHttpResponse;
+//  lClient : IHttpClientInternal;
+//begin
+//  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
+//  FHttpMethod := THttpMethod.PATCH;
+//  entityType := TypeInfo(T);
+//  returnType := TypeInfo(R);
+//  lClient := GetClient;
+//  response := lClient.Send(Self, cancellationToken);
+//
+//  result := nil;
+//end;
 
-  result := nil;
-end;
-
-function TRequest.Patch<T>(const entity : T; const cancellationToken: ICancellationToken): IHttpResponse;
-var
-  entityType : PTypeInfo;
-  response : IHttpResponse;
-  lClient : IHttpClientInternal;
-begin
-  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
-
-  FHttpMethod := THttpMethod.PATCH;
-  entityType := TypeInfo(T);
-  lClient := GetClient;
-  response := lClient.Send(self, cancellationToken);
-
-  result := nil;
-end;
+//function TRequest.Patch<T>(const entity : T; const cancellationToken: ICancellationToken): IHttpResponse;
+//var
+//  entityType : PTypeInfo;
+//  response : IHttpResponse;
+//  lClient : IHttpClientInternal;
+//begin
+//  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
+//
+//  FHttpMethod := THttpMethod.PATCH;
+//  entityType := TypeInfo(T);
+//  lClient := GetClient;
+//  response := lClient.Send(self, cancellationToken);
+//
+//  result := nil;
+//end;
 
 function TRequest.Post(const cancellationToken: ICancellationToken): IHttpResponse;
 var
@@ -736,37 +752,37 @@ begin
   result := lClient.Send(self, cancellationToken);
 end;
 
-function TRequest.Post<T, R>(const entity : T; const cancellationToken: ICancellationToken): R;
-var
-  entityType : PTypeInfo;
-  returnType : PTypeInfo;
-  response : IHttpResponse;
-  lClient : IHttpClientInternal;
-begin
-  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
+//function TRequest.Post<T, R>(const entity : T; const cancellationToken: ICancellationToken): R;
+//var
+//  entityType : PTypeInfo;
+//  returnType : PTypeInfo;
+//  response : IHttpResponse;
+//  lClient : IHttpClientInternal;
+//begin
+//  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
+//
+//  FHttpMethod := THttpMethod.POST;
+//  entityType := TypeInfo(T);
+//  returnType := TypeInfo(R);
+//  lClient := GetClient;
+//  response := lClient.Send(Self, cancellationToken );
+//  result := nil;
+//end;
 
-  FHttpMethod := THttpMethod.POST;
-  entityType := TypeInfo(T);
-  returnType := TypeInfo(R);
-  lClient := GetClient;
-  response := lClient.Send(Self, cancellationToken );
-  result := nil;
-end;
-
-function TRequest.Post<T>(const entity : T;  const cancellationToken: ICancellationToken): IHttpResponse;
-var
-  entityType : PTypeInfo;
-  lClient : IHttpClientInternal;
-begin
-  raise ENotImplemented.Create('Serialization not implemented yet');
-
-  FHttpMethod := THttpMethod.POST;
-  entityType := TypeInfo(T);
-
-  //TODO : serialize entity
-  lClient := GetClient;
-  result := lClient.Send(self, cancellationToken);
-end;
+//function TRequest.Post<T>(const entity : T;  const cancellationToken: ICancellationToken): IHttpResponse;
+//var
+//  entityType : PTypeInfo;
+//  lClient : IHttpClientInternal;
+//begin
+//  raise ENotImplemented.Create('Serialization not implemented yet');
+//
+//  FHttpMethod := THttpMethod.POST;
+//  entityType := TypeInfo(T);
+//
+//  //TODO : serialize entity
+//  lClient := GetClient;
+//  result := lClient.Send(self, cancellationToken);
+//end;
 
 function TRequest.Put(const cancellationToken: ICancellationToken): IHttpResponse;
 var
@@ -777,37 +793,37 @@ begin
   result := lClient.Send(self, cancellationToken);
 end;
 
-function TRequest.Put<T, R>(const entity: T; const cancellationToken: ICancellationToken): R;
-var
-  entityType : PTypeInfo;
-  returnType : PTypeInfo;
-  response : IHttpResponse;
-  lClient : IHttpClientInternal;
-begin
-  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
-  FHttpMethod := THttpMethod.PUT;
-  entityType := TypeInfo(T);
-  returnType := TypeInfo(R);
-  lClient := GetClient;
-  response := lClient.Send(Self, cancellationToken );
-
-  result := nil;
-
-end;
-
-function TRequest.Put<T>(const entity : T;  const cancellationToken: ICancellationToken): IHttpResponse;
-var
-  entityType : PTypeInfo;
-  lClient : IHttpClientInternal;
-begin
-  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
-  FHttpMethod := THttpMethod.PUT;
-  entityType := TypeInfo(T);
-
-  //TODO : Serialize!
-  lClient := GetClient;
-  result := lClient.Send(self, cancellationToken);
-end;
+//function TRequest.Put<T, R>(const entity: T; const cancellationToken: ICancellationToken): R;
+//var
+//  entityType : PTypeInfo;
+//  returnType : PTypeInfo;
+//  response : IHttpResponse;
+//  lClient : IHttpClientInternal;
+//begin
+//  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
+//  FHttpMethod := THttpMethod.PUT;
+//  entityType := TypeInfo(T);
+//  returnType := TypeInfo(R);
+//  lClient := GetClient;
+//  response := lClient.Send(Self, cancellationToken );
+//
+//  result := nil;
+//
+//end;
+//
+//function TRequest.Put<T>(const entity : T;  const cancellationToken: ICancellationToken): IHttpResponse;
+//var
+//  entityType : PTypeInfo;
+//  lClient : IHttpClientInternal;
+//begin
+//  raise ENotImplemented.Create('Serialization/Deserialization not implemented yet');
+//  FHttpMethod := THttpMethod.PUT;
+//  entityType := TypeInfo(T);
+//
+//  //TODO : Serialize!
+//  lClient := GetClient;
+//  result := lClient.Send(self, cancellationToken);
+//end;
 
 procedure TRequest.SetAccept(const value: string);
 begin
