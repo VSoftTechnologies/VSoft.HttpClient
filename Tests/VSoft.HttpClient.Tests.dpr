@@ -19,7 +19,8 @@ uses
   VSoft.HttpClient in '..\Source\VSoft.HttpClient.pas',
   VSoft.HttpClient.Response in '..\Source\VSoft.HttpClient.Response.pas',
   VSoft.HttpClient.WinHttpClient in '..\Source\VSoft.HttpClient.WinHttpClient.pas',
-  VSoft.WinHttp.Api in '..\Source\VSoft.WinHttp.Api.pas';
+  VSoft.WinHttp.Api in '..\Source\VSoft.WinHttp.Api.pas',
+  VSoft.HttpClient.Request in '..\Source\VSoft.HttpClient.Request.pas';
 
 {$IFNDEF TESTINSIGHT}
 var

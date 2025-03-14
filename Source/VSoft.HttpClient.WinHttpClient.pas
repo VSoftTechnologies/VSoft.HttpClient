@@ -5,7 +5,6 @@ interface
 uses
   System.TypInfo,
   System.SysUtils,
-  System.Generics.Collections,
   System.SyncObjs,
   System.Classes,
   WinApi.Windows,
@@ -23,12 +22,11 @@ type
 
     FSession : HINTERNET;
     FUserAgent : string;
-    FRequests : TList<TRequest>;
     FAuthTyp : THttpAuthType;
     FUserName : string;
     FPassword : string;
     FWaitEvent : TEvent;
-    FCurrentRequest : TRequest;
+    FCurrentRequest : IHttpRequest;
     FResponse : IHttpResponseInternal;
     FReceiveBuffer : TBytes;
     FLastReceiveBlockSize : DWORD;
@@ -55,7 +53,7 @@ type
     function WriteData(hRequest : HINTERNET; position : DWORD) : boolean;
     function WriteHeaders(hRequest : HINTERNET; const headers : TStrings) : DWORD;
 
-    function ConfigureWinHttpRequest(hRequest : HINTERNET; const request : TRequest) : DWORD;
+    function ConfigureWinHttpRequest(hRequest : HINTERNET; const request : IHttpRequest) : DWORD;
 
     function ChooseAuth(dwSupportedSchemes : DWORD) : DWORD;
 
@@ -94,25 +92,28 @@ type
 
 
 
-    function CreateRequest(const resource : string) : TRequest;overload;
-    function CreateRequest(const uri : IUri) : TRequest;overload;
+    function CreateRequest(const resource : string) : IHttpRequest;overload;
+    function CreateRequest(const uri : IUri) : IHttpRequest;overload;
 
 
     procedure UseSerializer(const useFunc : TUseSerializerFunc);overload;
     procedure UseSerializer(const serializer : IRestSerializer);overload;
 
 
-    function GetResourceFromRequest(const request : TRequest) : string;
+    function GetResourceFromRequest(const request : IHttpRequest) : string;
 
 
-    //IHttpClientInternal
-    function Send(const request : TRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
+    function Send(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
+    function Get(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
+    function Post(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
+    function Patch(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
+    function Put(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
+    function Delete(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
 
 
   public
     constructor Create(const uri : IUri);
     destructor Destroy;override;
-    procedure ReleaseRequest(const request : TRequest);override;
   end;
 
 
@@ -121,15 +122,16 @@ implementation
 uses
   System.RTLConsts,
   System.Math,
-  System.StrUtils;
+  System.StrUtils,
+  VSoft.HttpClient.Request;
 
 //TODO : What is the optimum buffer size?
 const cReceiveBufferSize : DWORD = 32 * 1024;
 
 //const E_UNEXPECTED = HRESULT($8000FFFF);
 
-type
-  TRequestCracker = class(TRequest);
+//type
+//  TRequestCracker = class(TRequest);
 
 
 procedure _HTTPCallback(hInternet: HINTERNET; dwContext: Pointer; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD); stdcall;
@@ -142,20 +144,17 @@ begin
 
 end;
 
-function THttpClient.CreateRequest(const resource: string): TRequest;
+function THttpClient.CreateRequest(const resource: string): IHttpRequest;
 begin
   if resource = '' then
     result := TRequest.Create(Self, FUri)
   else
     result := TRequest.Create(Self, resource);
-  FRequests.Add(result); //track requests to ensure they get freed.
 end;
 
-function THttpClient.CreateRequest(const uri: IUri): TRequest;
+function THttpClient.CreateRequest(const uri: IUri): IHttpRequest;
 begin
   result := TRequest.Create(Self, uri);
-  FRequests.Add(result); //track requests to ensure they get freed.
-
 end;
 
 
@@ -199,7 +198,7 @@ begin
 
 end;
 
-function THttpClient.ConfigureWinHttpRequest(hRequest: HINTERNET; const request: TRequest): DWORD;
+function THttpClient.ConfigureWinHttpRequest(hRequest: HINTERNET; const request: IHttpRequest): DWORD;
 var
   option : DWORD;
 begin
@@ -232,7 +231,6 @@ end;
 
 constructor THttpClient.Create(const uri : IUri);
 begin
-  FRequests := TList<TRequest>.Create;
   FUri := uri;
   FUserAgent := 'VSoft.HttpClient';
   FWaitEvent := TEvent.Create(nil,false, false,'');
@@ -241,19 +239,16 @@ end;
 
 
 
+function THttpClient.Delete(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
+begin
+  request.HtttpMethod := THttpMethod.DELETE;
+  result := Send(request, cancellationToken);
+end;
+
 destructor THttpClient.Destroy;
-var
-  i : integer;
 begin
   FWaitEvent.SetEvent;
 
-  if FRequests.Count > 0 then
-  begin
-    //reverse order as they remove themselves from the list.
-    for i := FRequests.Count -1 downto 0 do
-      FRequests[i].Free;
-  end;
-  FRequests.Free;
   if FSession <> nil then
     WinHttpCloseHandle(FSession);
   FWaitEvent.Free;
@@ -268,6 +263,12 @@ begin
     RaiseLastOSError;
 end;
 
+
+function THttpClient.Get(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
+begin
+  request.HtttpMethod := THttpMethod.GET;
+  result := Send(request, cancellationToken);
+end;
 
 function THttpClient.GetAllowSelfSignedCertificates: boolean;
 begin
@@ -300,7 +301,7 @@ begin
   result := FPassword;
 end;
 
-function THttpClient.GetResourceFromRequest(const request: TRequest): string;
+function THttpClient.GetResourceFromRequest(const request: IHttpRequest): string;
 var
   i : integer;
 begin
@@ -630,10 +631,24 @@ begin
     end;
 
   end;
+end;
 
+function THttpClient.Patch(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
+begin
+  request.HtttpMethod := THttpMethod.PATCH;
+  result := Send(request, cancellationToken);
+end;
 
+function THttpClient.Post(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
+begin
+  request.HtttpMethod := THttpMethod.POST;
+  result := Send(request, cancellationToken);
+end;
 
-
+function THttpClient.Put(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
+begin
+  request.HtttpMethod := THttpMethod.PUT;
+  result := Send(request, cancellationToken);
 end;
 
 function THttpClient.ReadData(hRequest: HINTERNET; dataSize : DWORD): boolean;
@@ -646,13 +661,6 @@ begin
 end;
 
 
-procedure THttpClient.ReleaseRequest(const request: TRequest);
-begin
-  if FRequests.Contains(request) then
-    FRequests.Remove(request);
-end;
-
-
 const http_version = 'HTTP/2';
 
 const WAIT_OBJECT_1 = WAIT_OBJECT_0 + 1;
@@ -660,7 +668,7 @@ const WAIT_OBJECT_1 = WAIT_OBJECT_0 + 1;
 
 
 //simple get/post etc.
-function THttpClient.Send(const request: TRequest; const cancellationToken: ICancellationToken): IHttpResponse;
+function THttpClient.Send(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
 var
   urlComp : TURLComponents;
   host : string;
@@ -786,8 +794,8 @@ begin
 
       if (request.HtttpMethod <> THttpMethod.GET) and (FDataLength > 0) then
       begin
-        stream := TRequestCracker(FCurrentRequest).GetBody;
-        bufferSize := TRequestCracker(FCurrentRequest).GetContentLength;
+        stream := FCurrentRequest.GetBody;
+        bufferSize := FCurrentRequest.GetContentLength;
         SetLength(buffer,bufferSize);
         ZeroMemory(@buffer[0], bufferSize);
         {$IF CompilerVersion > 25.0} //XE5+
@@ -955,8 +963,8 @@ var
   size : Int64;
   bufferSize : DWORD;
 begin
-  stream := TRequestCracker(FCurrentRequest).GetBody;
-  size := TRequestCracker(FCurrentRequest).GetContentLength;
+  stream := FCurrentRequest.GetBody;
+  size := FCurrentRequest.GetContentLength;
 
   size := size - position;
 
@@ -981,7 +989,7 @@ begin
   if headers.Count = 0 then
     exit;
 
-  sCharSet := TRequestCracker(FCurrentRequest).GetCharSet;
+  sCharSet := FCurrentRequest.GetCharSet;
 
   for i := 0 to headers.Count -1 do
   begin

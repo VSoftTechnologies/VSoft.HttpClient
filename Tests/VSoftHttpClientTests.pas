@@ -22,10 +22,10 @@ type
 //    [Test]
     procedure TestParameters;
 
-//    [Test]
+    [Test]
     procedure TestWithUri;
 
-    [Test]
+//    [Test]
     procedure TestResponseStream;
   end;
 
@@ -42,17 +42,15 @@ procedure TMyTestObject.TestGet;
 var
   client : IHttpClient;
   response : IHttpResponse;
+  request : IHttpRequest;
   i : integer;
   cancelTokenSource : ICancellationTokenSource;
 begin
   cancelTokenSource := TCancellationTokenSourceFactory.Create;
 
   client := THttpClientFactory.CreateClient('https://localhost:5001');
-  response := client.CreateRequest('api/v1/index.json')
-    .WithParameter('name', 'the value')
-  .Get(cancelTokenSource.Token);
-
-
+  request := client.CreateRequest('api/v1/index.json').WithParameter('name', 'the value');
+  response := client.Get(request, cancelTokenSource.Token);
 
   if response.StatusCode <> 200 then
     WriteLn(response.ErrorMessage);
@@ -71,7 +69,7 @@ procedure TMyTestObject.TestParameters;
 var
   client : IHttpClient;
   response : IHttpResponse;
-  request : TRequest;
+  request : IHttpRequest;
   cancelTokenSource : ICancellationTokenSource;
 begin
   exit;
@@ -84,7 +82,7 @@ begin
   request.WithAccept('application/json')
          .WithParameter('versionRange', '[0.0.2,2.0.0]')// versionRange.ToString)
          .WithParameter('prerel', 'true');
-  response := request.Get(cancelTokenSource.Token);
+  response := client.Get(request, cancelTokenSource.Token);
 
   if response.StatusCode <> 200 then
     WriteLn(response.ErrorMessage);
@@ -101,7 +99,7 @@ procedure TMyTestObject.TestPostForm;
 var
   client : IHttpClient;
   response : IHttpResponse;
-  request : TRequest;
+  request : IHttpRequest;
   cancelTokenSource : ICancellationTokenSource;
 begin
   cancelTokenSource := TCancellationTokenSourceFactory.Create;
@@ -113,7 +111,7 @@ begin
 
   request.WithHeader('X-ApiKey', 'foobar')
          .WithFile('i:\dpmfeed\ADUG.BasicLib-10.1-Win32-1.0.24.dpkg');
-  response := request.Put(cancelTokenSource.Token);
+  response := client.Put(request,cancelTokenSource.Token);
 
   if response.StatusCode <> 200 then
     WriteLn(response.ErrorMessage);
@@ -127,14 +125,15 @@ procedure TMyTestObject.TestResponseStream;
 var
   client : IHttpClient;
   response : IHttpResponse;
+  request : IHttpRequest;
   cancelTokenSource : ICancellationTokenSource;
   stream : TMemoryStream;
 begin
   cancelTokenSource := TCancellationTokenSourceFactory.Create;
 
   client := THttpClientFactory.CreateClient('https://localhost:5002');
-  response := client.CreateRequest('/api/v1/package/VSoft.DUnitX/11.0/Win32/0.3.3/icon')
-  .Get(cancelTokenSource.Token);
+  request := client.CreateRequest('/api/v1/package/VSoft.DUnitX/11.0/Win32/0.3.3/icon');
+  response := client.Get(request, cancelTokenSource.Token);
 
 
   if response.StatusCode <> 200 then
@@ -184,7 +183,7 @@ var
   uri : IUri;
   client : IHttpClient;
   response : IHttpResponse;
-  request : TRequest;
+  request : IHttpRequest;
   cancelTokenSource : ICancellationTokenSource;
 begin
   cancelTokenSource := TCancellationTokenSourceFactory.Create;
@@ -194,7 +193,7 @@ begin
     .WithBody('{"compiler": "XE7","platform": "Win32","packageids": [{"id": "Spring4D.Data","version": "2.0.0-rc.2"},{"id": "Spring4D.Base","version": "2.0.0-rc.2"}]}', TEncoding.UTF8)
     .WithContentType('application/json', 'utf-8');
 
-  response := request.Post(cancelTokenSource.Token);
+  response := client.Post(request, cancelTokenSource.Token);
   Assert.AreEqual<integer>(200, response.StatusCode);
 end;
 
