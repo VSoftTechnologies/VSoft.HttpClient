@@ -45,7 +45,7 @@ type
 
     procedure AddField(const fieldName : string; const value : string);
     procedure AddFile(const fieldName : string; const filePath : string; const contentType: string = '');
-    procedure AddStream(const fieldName: string; stream: TStream; const fileName: string = ''; const contentType: string = '');
+    procedure AddStream(const fieldName: string; const stream: TStream; const fileName: string = ''; const contentType: string = '');
 
     //wraps the stream in an adapter and sets the boundary to a new value, so get the boundary/contenttype first!
     function Generate : TStream;
@@ -89,7 +89,7 @@ type
 
     procedure AddField(const fieldName: string; const value: string);
     procedure AddFile(const fieldName: string; const filePath: string; const contentType: string = '');
-    procedure AddStream(const fieldName: string; stream: TStream; const fileName: string = ''; const contentType: string = '');
+    procedure AddStream(const fieldName: string; const stream: TStream; const fileName: string = ''; const contentType: string = '');
 
     class procedure AddDefaultMimeTypes;
     class procedure AddWindowsMimeTypes;
@@ -783,7 +783,7 @@ begin
   end;
 end;
 
-procedure TMultipartFormData.AddStream(const fieldName: string; stream: TStream; const fileName, contentType: string);
+procedure TMultipartFormData.AddStream(const fieldName: string; const stream: TStream; const fileName, contentType: string);
 var
   sLine, sContentType: string;
 begin

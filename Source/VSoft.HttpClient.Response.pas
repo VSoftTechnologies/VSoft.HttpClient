@@ -95,6 +95,7 @@ constructor THttpResponse.Create(const httpResult: integer; const errorMsg : str
 var
   i: Integer;
 begin
+  inherited Create;
   FStatusCode := httpResult;
   FErrorMessage := errorMsg;
   if not IsSuccess and (FErrorMessage = '') then

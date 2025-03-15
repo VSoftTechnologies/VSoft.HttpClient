@@ -24,7 +24,6 @@ uses
 type
   TRequest = class(TInterfacedObject, IHttpRequest)
   private
-    FClient : IHttpClient;
     FHttpMethod : THttpMethod;
     FHeaders : TStringList;
     FRequestParams : TStringList;
