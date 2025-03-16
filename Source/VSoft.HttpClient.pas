@@ -259,7 +259,7 @@ type
     property BaseUri    : string read GetBaseUri write SetBaseUri;
     property UserAgent  : string read GetUserAgent write SetUserAgent;
     property UserName  : string read GetUserName write SetUserName;
-    property Passsword : string read GetPassword write SetPassword;
+    property Password : string read GetPassword write SetPassword;
     property ProxyUserName : string read GetProxyUserName write SetProxyUserName;
     property ProxyPassword : string read GetProxyPassword write SetProxyPassword;
 
