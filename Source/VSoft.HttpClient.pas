@@ -81,10 +81,6 @@ type
     function GetSaveAsFile : string;
     function GetResource : string;
 
-    function GetUserName : string;
-    function GetPassword : string;
-    function GetProxyUserName : string;
-    function GetProxyPassword : string;
     function GetConnectionTimeout : integer;
     function GetSendTimeout : integer;
     function GetResponseTimeout : integer;
@@ -98,10 +94,6 @@ type
     procedure SetHttpMethod(value : THttpMethod);
     procedure SetSaveAsFile(const value : string);
     procedure SetResource(const value : string);
-    procedure SetUserName(const value : string);
-    procedure SetPassword(const value : string);
-    procedure SetProxyUserName(const value : string);
-    procedure SetProxyPassword(const value : string);
 
     procedure SetConnectionTimeout(value : integer);
     procedure SetSendTimeout(value : integer);
@@ -163,10 +155,6 @@ type
     property Resource    : string read GetResource write SetResource;
     property ContentLength : Int64 read GetContentLength;
     property SaveAsFile  : string read GetSaveAsFile write SetSaveAsFile;
-    property UserName  : string read GetUserName write SetUserName;
-    property Passsword : string read GetPassword write SetPassword;
-    property ProxyUserName : string read GetProxyUserName write SetProxyUserName;
-    property ProxyPassword : string read GetProxyPassword write SetProxyPassword;
 
     property ConnectionTimeout: Integer read GetConnectionTimeout write SetConnectionTimeout;
     property SendTimeout: Integer read GetSendTimeout write SetSendTimeout;
@@ -236,6 +224,13 @@ type
     function GetPassword : string;
     procedure SetPassword(const value : string);
 
+    function GetProxyUserName : string;
+    procedure SetProxyUserName(const value : string);
+
+    function GetProxyPassword : string;
+    procedure SetProxyPassword(const value : string);
+
+
     function GetConnectionTimeout : integer;
     procedure SetConnectionTimeout(const value : integer);
 
@@ -263,8 +258,10 @@ type
     property AuthType   : THttpAuthType read GetAuthType write SetAuthType;
     property BaseUri    : string read GetBaseUri write SetBaseUri;
     property UserAgent  : string read GetUserAgent write SetUserAgent;
-    property UserName   : string read GetUserName write SetUserName;
-    property Password   : string read GetPassword write SetPassword;
+    property UserName  : string read GetUserName write SetUserName;
+    property Passsword : string read GetPassword write SetPassword;
+    property ProxyUserName : string read GetProxyUserName write SetProxyUserName;
+    property ProxyPassword : string read GetProxyPassword write SetProxyPassword;
 
     property ConnectionTimeout: Integer read GetConnectionTimeout write SetConnectionTimeout;
     property SendTimeout: Integer read GetSendTimeout write SetSendTimeout;

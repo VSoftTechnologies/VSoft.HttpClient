@@ -35,10 +35,6 @@ type
     FEncoding : TEncoding;
     FForceFormData : boolean;
 	  FFollowRedirects : boolean;
-    FUserName : string;
-    FPassword : string;
-    FProxyUserName : string;
-    FProxyPassword : string;
 
     FConnectionTimeout: Integer;
     FSendTimeout: Integer;
@@ -60,10 +56,6 @@ type
     function GetSaveAsFile : string;
     function GetResource : string;
 
-    function GetUserName : string;
-    function GetPassword : string;
-    function GetProxyUserName : string;
-    function GetProxyPassword : string;
     function GetConnectionTimeout : integer;
     function GetSendTimeout : integer;
     function GetResponseTimeout : integer;
@@ -77,10 +69,6 @@ type
     procedure SetHttpMethod(value : THttpMethod);
     procedure SetSaveAsFile(const value : string);
     procedure SetResource(const value : string);
-    procedure SetUserName(const value : string);
-    procedure SetPassword(const value : string);
-    procedure SetProxyUserName(const value : string);
-    procedure SetProxyPassword(const value : string);
 
     procedure SetConnectionTimeout(value : integer);
     procedure SetSendTimeout(value : integer);
@@ -147,10 +135,6 @@ type
     property Resource    : string read GetResource write SetResource;
     property ContentLength : Int64 read GetContentLength;
     property SaveAsFile  : string read FSaveAsFile write FSaveAsFile;
-    property UserName  : string read FUserName write FUserName;
-    property Passsword : string read FPassword write FPassword;
-    property ProxyUserName : string read FProxyUserName write FProxyUserName;
-    property ProxyPassword : string read FProxyPassword write FProxyPassword;
 
     property ConnectionTimeout: Integer read FConnectionTimeout write FConnectionTimeout;
     property SendTimeout: Integer read FSendTimeout write FSendTimeout;
@@ -375,20 +359,6 @@ begin
   result := FRequestParams;
 end;
 
-function TRequest.GetPassword: string;
-begin
-  result := FPassword;
-end;
-
-function TRequest.GetProxyPassword: string;
-begin
-  result := FProxyPassword;
-end;
-
-function TRequest.GetProxyUserName: string;
-begin
-  result := FProxyUserName;
-end;
 
 function TRequest.GetResource: string;
 begin
@@ -414,11 +384,6 @@ end;
 function TRequest.GetUrlSegments: TStrings;
 begin
   result := FUrlSegments;
-end;
-
-function TRequest.GetUserName: string;
-begin
-  result := FUserName;
 end;
 
 
@@ -462,21 +427,6 @@ begin
   FHttpMethod := value;
 end;
 
-procedure TRequest.SetPassword(const value: string);
-begin
-  FPassword := value;
-end;
-
-procedure TRequest.SetProxyPassword(const value: string);
-begin
-  FProxyPassword := value;
-end;
-
-procedure TRequest.SetProxyUserName(const value: string);
-begin
-  FProxyUserName := value;
-end;
-
 procedure TRequest.SetResource(const value: string);
 begin
  FURI.Path := value;
@@ -497,10 +447,6 @@ begin
   FSendTimeout := value;
 end;
 
-procedure TRequest.SetUserName(const value: string);
-begin
-  FUserName := value;
-end;
 
 function TRequest.WillFollowRedirects: IHttpRequest;
 begin

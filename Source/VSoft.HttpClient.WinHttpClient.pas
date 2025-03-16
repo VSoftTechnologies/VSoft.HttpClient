@@ -25,6 +25,9 @@ type
     FAuthTyp : THttpAuthType;
     FUserName : string;
     FPassword : string;
+    FProxyUserName : string;
+    FProxyPassword : string;
+
     FWaitEvent : TEvent;
     FCurrentRequest : IHttpRequest;
     FResponse : IHttpResponseInternal;
@@ -74,6 +77,13 @@ type
     function GetPassword : string;
     procedure SetUserName(const value : string);
     procedure SetPassword(const value : string);
+    function GetProxyUserName : string;
+    procedure SetProxyUserName(const value : string);
+
+    function GetProxyPassword : string;
+    procedure SetProxyPassword(const value : string);
+
+
 
     function GetUseHttp2 : boolean;
     procedure SetUseHttp2(const value : boolean);
@@ -89,6 +99,8 @@ type
 
     function GetResponseTimeout : integer;
     procedure SetResponseTimeout(const value : integer);
+
+
 
 
 
@@ -301,6 +313,16 @@ begin
   result := FPassword;
 end;
 
+function THttpClient.GetProxyPassword: string;
+begin
+  result := FProxyPassword;
+end;
+
+function THttpClient.GetProxyUserName: string;
+begin
+  result := FProxyUserName;
+end;
+
 function THttpClient.GetResourceFromRequest(const request: IHttpRequest): string;
 var
   i : integer;
@@ -366,9 +388,9 @@ begin
   case dwAuthTarget  of
     WINHTTP_AUTH_TARGET_SERVER :
     begin
-      if FCurrentRequest.UserName <> '' then
+      if FUserName <> '' then
       begin
-        if not WinHttpSetCredentials(hRequest, dwAuthTarget, dwAuthenticationScheme, PChar(FCurrentRequest.UserName), PChar(FCurrentRequest.Passsword),nil) then
+        if not WinHttpSetCredentials(hRequest, dwAuthTarget, dwAuthenticationScheme, PChar(FUserName), PChar(FPassword),nil) then
           result := S_OK
         else
           result := GetLastError;
@@ -377,9 +399,9 @@ begin
     end;
     WINHTTP_AUTH_TARGET_PROXY :
     begin
-      if FCurrentRequest.ProxyUserName <> '' then
+      if FProxyUserName <> '' then
       begin
-        if WinHttpSetCredentials(hRequest, dwAuthTarget, dwAuthenticationScheme, PChar(FCurrentRequest.ProxyUserName), PChar(FCurrentRequest.ProxyPassword),nil) then
+        if WinHttpSetCredentials(hRequest, dwAuthTarget, dwAuthenticationScheme, PChar(FProxyUserName), PChar(FProxyPassword),nil) then
           result := S_OK
         else
           result := GetLastError;
@@ -890,6 +912,16 @@ end;
 procedure THttpClient.SetPassword(const value: string);
 begin
   FPassword := value;
+end;
+
+procedure THttpClient.SetProxyPassword(const value: string);
+begin
+  FProxyPassword := value;
+end;
+
+procedure THttpClient.SetProxyUserName(const value: string);
+begin
+  FProxyUserName := value;
 end;
 
 procedure THttpClient.SetResponseTimeout(const value: integer);
