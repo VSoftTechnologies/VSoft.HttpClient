@@ -1,11 +1,12 @@
 {
  "metadata": {
   "id": "VSoft.HttpClient",
-  "version": "2.2.2",
+  "version": "2.2.3",
   "description": "WinHttp base http client",
   "authors": "Vincent Parrett",
   "projectUrl": "https://github.com/VSoftTechnologies/VSoft.HttpClient",
   "repositoryUrl": "https://github.com/VSoftTechnologies/VSoft.HttpClient",
+  "repositoryCommit": "#HASH#",   
   "license": "Apache-2.0",
   "copyright": "Vincent Parrett and contributors",
   "tags": "http client winhttp",
@@ -94,11 +95,11 @@
    "dependencies": [
     {
      "id": "VSoft.CancellationToken",
-     "version": "[0.1.2,]"
+     "version": "[0.1.4,]"
     },
     {
      "id": "VSoft.Uri",
-     "version": "[0.3.2,]"
+     "version": "[0.3.3,]"
     }
    ],
    "source": [
