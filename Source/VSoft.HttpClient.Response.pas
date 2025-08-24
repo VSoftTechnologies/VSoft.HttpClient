@@ -368,7 +368,7 @@ begin
   {$IF CompilerVersion > 23.0} //XE3+
     FStream.WriteData(buffer, length);
   {$ELSE}
-    FStream.WriteBuffer(buffer, length);
+    FStream.WriteBuffer(buffer[0], length);
   {$IFEnd}
 end;
 

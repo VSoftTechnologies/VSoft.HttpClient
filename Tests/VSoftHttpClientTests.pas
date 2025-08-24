@@ -10,7 +10,7 @@ type
   [TestFixture]
   TMyTestObject = class
   public
-//    [Test]
+    [Test]
     procedure TestGet;
 
 //    [Test]
@@ -22,7 +22,7 @@ type
 //    [Test]
     procedure TestParameters;
 
-    [Test]
+//    [Test]
     procedure TestWithUri;
 
 //    [Test]
@@ -48,8 +48,8 @@ var
 begin
   cancelTokenSource := TCancellationTokenSourceFactory.Create;
 
-  client := THttpClientFactory.CreateClient('https://localhost:5001');
-  request := client.CreateRequest('api/v1/index.json').WithParameter('name', 'the value');
+  client := THttpClientFactory.CreateClient('https://delphi.dev');
+  request := client.CreateRequest('api/v1/index.json');
   response := client.Get(request, cancelTokenSource.Token);
 
   if response.StatusCode <> 200 then
@@ -57,6 +57,7 @@ begin
 
   Assert.AreEqual<integer>(200, response.StatusCode);
   Assert.AreNotEqual<integer>(0, response.ContentLength);
+  Assert.IsNotEmpty(response.Response, 'response is empty');
 
   for i := 0 to response.Headers.Count -1 do
     Writeln(response.Headers.Strings[i]);

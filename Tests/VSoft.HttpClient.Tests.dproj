@@ -11,7 +11,7 @@
         <AppType>Console</AppType>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>XE7</DPMCompiler>
+        <DPMCompiler>XE2</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
         <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.3.0\src;$(DPM)\VSoft.DUnitX\0.3.1\src;$(DPM)\VSoft.CancellationToken\0.1.2\lib;</DPMSearch>
@@ -497,12 +497,16 @@
         </BorlandProject>
         <ProjectFileVersion>12</ProjectFileVersion>
         <DPM>
-            <PackageReference id="VSoft.CancellationToken" platform="Win32" version="0.1.2"/>
-            <PackageReference id="VSoft.DUnitX" platform="Win32" version="0.3.1"/>
-            <PackageReference id="VSoft.Uri" platform="Win32" version="0.3.0" useSource="true"/>
-            <PackageReference id="VSoft.CancellationToken" platform="Win64" version="0.1.2"/>
-            <PackageReference id="VSoft.DUnitX" platform="Win64" version="0.3.1"/>
-            <PackageReference id="VSoft.Uri" platform="Win64" version="0.3.0" useSource="true"/>
+            <PackageReferences platform="Win32">
+                <PackageReference id="VSoft.CancellationToken" version="0.1.2"/>
+                <PackageReference id="VSoft.DUnitX" version="0.3.1"/>
+                <PackageReference id="VSoft.Uri" version="0.3.0" useSource="true"/>
+            </PackageReferences>
+            <PackageReferences platform="Win64">
+                <PackageReference id="VSoft.CancellationToken" version="0.1.2"/>
+                <PackageReference id="VSoft.DUnitX" version="0.3.1"/>
+                <PackageReference id="VSoft.Uri" version="0.3.0" useSource="true"/>
+            </PackageReferences>
         </DPM>
     </ProjectExtensions>
     <Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
