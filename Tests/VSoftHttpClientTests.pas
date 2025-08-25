@@ -19,10 +19,10 @@ type
 //    [Test]
     procedure TestPostForm;
 
-//    [Test]
+    [Test]
     procedure TestParameters;
 
-//    [Test]
+    [Test]
     procedure TestWithUri;
 
 //    [Test]
@@ -76,7 +76,7 @@ begin
   exit;
   cancelTokenSource := TCancellationTokenSourceFactory.Create;
 
-  client := THttpClientFactory.CreateClient('https://localhost:5001');
+  client := THttpClientFactory.CreateClient('https://delphi.dev');
 
   request := client.CreateRequest('/api/v1/package/spring4d.core/10.4/Win32/versionswithdependencies');
 

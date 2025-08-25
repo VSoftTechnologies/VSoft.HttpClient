@@ -516,7 +516,7 @@ begin
 
   bytes := FEncoding.GetBytes(value);
   FContent := TMemoryStream.Create;
-  FContent.WriteBuffer(bytes, Length(bytes));
+  FContent.WriteBuffer(bytes[0], Length(bytes));
   FOwnsContent := true;
   FContent.Seek(0,TSeekOrigin.soBeginning);
   result := Self;

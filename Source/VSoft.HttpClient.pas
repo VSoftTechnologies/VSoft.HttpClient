@@ -151,7 +151,7 @@ type
     property ContentType    : string read GetContentType write SetContentType;
 
     property FollowRedirects : boolean read GetFollowRedirects write SetFollowRedirects;
-    property HtttpMethod : THttpMethod read GetHttpMethod write SetHttpMethod;
+    property HttpMethod : THttpMethod read GetHttpMethod write SetHttpMethod;
     property Resource    : string read GetResource write SetResource;
     property ContentLength : Int64 read GetContentLength;
     property SaveAsFile  : string read GetSaveAsFile write SetSaveAsFile;

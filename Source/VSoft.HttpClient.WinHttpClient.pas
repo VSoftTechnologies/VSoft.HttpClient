@@ -253,7 +253,7 @@ end;
 
 function THttpClient.Delete(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
 begin
-  request.HtttpMethod := THttpMethod.DELETE;
+  request.HttpMethod := THttpMethod.DELETE;
   result := Send(request, cancellationToken);
 end;
 
@@ -278,7 +278,7 @@ end;
 
 function THttpClient.Get(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
 begin
-  request.HtttpMethod := THttpMethod.GET;
+  request.HttpMethod := THttpMethod.GET;
   result := Send(request, cancellationToken);
 end;
 
@@ -328,7 +328,7 @@ var
   i : integer;
 begin
   result := request.Resource;
-  if request.HtttpMethod <> THttpMethod.GET then
+  if request.HttpMethod <> THttpMethod.GET then
       exit;
 
   //for get request, we use the parameters
@@ -605,7 +605,7 @@ begin
     begin
       //write data here?
       if FBytesWritten < FCurrentRequest.ContentLength then
-        if FCurrentRequest.HtttpMethod <> THttpMethod.GET then
+        if FCurrentRequest.HttpMethod <> THttpMethod.GET then
         begin
           if not WriteData(hInternet, 0) then
           begin
@@ -657,19 +657,19 @@ end;
 
 function THttpClient.Patch(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
 begin
-  request.HtttpMethod := THttpMethod.PATCH;
+  request.HttpMethod := THttpMethod.PATCH;
   result := Send(request, cancellationToken);
 end;
 
 function THttpClient.Post(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
 begin
-  request.HtttpMethod := THttpMethod.POST;
+  request.HttpMethod := THttpMethod.POST;
   result := Send(request, cancellationToken);
 end;
 
 function THttpClient.Put(const request: IHttpRequest; const cancellationToken: ICancellationToken): IHttpResponse;
 begin
-  request.HtttpMethod := THttpMethod.PUT;
+  request.HttpMethod := THttpMethod.PUT;
   result := Send(request, cancellationToken);
 end;
 
@@ -776,7 +776,7 @@ begin
     if urlComp.nScheme = INTERNET_SCHEME_HTTPS then
       dwOpenRequestFlags := dwOpenRequestFlags + WINHTTP_FLAG_SECURE;
 
-    method := HttpMethodToString(request.HtttpMethod);
+    method := HttpMethodToString(request.HttpMethod);
 
     sResource := GetResourceFromRequest(request);
 
@@ -814,7 +814,7 @@ begin
       end;
 
 
-      if (request.HtttpMethod <> THttpMethod.GET) and (FDataLength > 0) then
+      if (request.HttpMethod <> THttpMethod.GET) and (FDataLength > 0) then
       begin
         stream := FCurrentRequest.GetBody;
         bufferSize := FCurrentRequest.GetContentLength;
@@ -823,7 +823,7 @@ begin
         {$IF CompilerVersion > 25.0} //XE5+
         stream.ReadBuffer(buffer,0 , bufferSize);
         {$ELSE}
-        stream.ReadBuffer(buffer, bufferSize);
+        stream.ReadBuffer(buffer[0], bufferSize);
         {$IFEND}
         FData := @buffer[0];
         FBytesWritten := FDataLength;
