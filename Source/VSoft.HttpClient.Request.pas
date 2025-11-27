@@ -226,7 +226,7 @@ end;
 function TRequest.ForceFormData(const value: boolean): IHttpRequest;
 begin
   result := self;
-  FForceFormData := true;
+  FForceFormData := value;
 end;
 
 function TRequest.GetAccept: string;
@@ -493,6 +493,8 @@ end;
 function TRequest.WithBody(const value: TStream; const takeOwnership: boolean; const encoding: TEncoding): IHttpRequest;
 begin
   result := self;
+  if (FContent <> nil) and FOwnsContent then
+    FContent.Free;
   FContent := value;
   FOwnsContent := takeOwnership;
   FEncoding := encoding;

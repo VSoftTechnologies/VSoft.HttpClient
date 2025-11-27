@@ -16,9 +16,12 @@ uses
 
 
 type
-  THttpClient = class(THttpClientBase, IHttpClient, IHttpClientInternal)
+  THttpClient = class(TInterfacedObject, IHttpClient, IHttpClientInternal)
   private
     FUri : IUri;
+    FConnectionTimeout: Integer;
+    FSendTimeout: Integer;
+    FResponseTimeout: Integer;
 
     FSession : HINTERNET;
     FUserAgent : string;
@@ -27,11 +30,14 @@ type
     FPassword : string;
     FProxyUserName : string;
     FProxyPassword : string;
+    FProxyUrl : string;
+    FProxyBypass : string;
 
     FWaitEvent : TEvent;
     FCurrentRequest : IHttpRequest;
     FResponse : IHttpResponseInternal;
     FReceiveBuffer : TBytes;
+    FWriteBuffer : TBytes;
     FLastReceiveBlockSize : DWORD;
     FBytesWritten : DWORD;
     FClientError : DWORD;
@@ -59,6 +65,7 @@ type
     function ConfigureWinHttpRequest(hRequest : HINTERNET; const request : IHttpRequest) : DWORD;
 
     function ChooseAuth(dwSupportedSchemes : DWORD) : DWORD;
+    function ChooseProxyAuth(dwSupportedSchemes : DWORD) : DWORD;
 
     procedure EnsureSession;
 
@@ -83,7 +90,11 @@ type
     function GetProxyPassword : string;
     procedure SetProxyPassword(const value : string);
 
+    function GetProxyUrl : string;
+    procedure SetProxyUrl(const value : string);
 
+    function GetProxyBypass : string;
+    procedure SetProxyBypass(const value : string);
 
     function GetUseHttp2 : boolean;
     procedure SetUseHttp2(const value : boolean);
@@ -99,8 +110,6 @@ type
 
     function GetResponseTimeout : integer;
     procedure SetResponseTimeout(const value : integer);
-
-
 
 
 
@@ -193,26 +202,25 @@ begin
     end;
   end;
 
-  //TODO : can we log an error here?
+end;
 
-//  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NEGOTIATE > 0 then
-//    exit(WINHTTP_AUTH_SCHEME_NEGOTIATE);
-//  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NTLM > 0 then
-//    exit(WINHTTP_AUTH_SCHEME_NTLM);
-//  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_PASSPORT > 0 then
-//    exit(WINHTTP_AUTH_SCHEME_PASSPORT);
-//  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_DIGEST > 0 then
-//    exit(WINHTTP_AUTH_SCHEME_DIGEST);
-//  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_BASIC > 0 then
-//    exit(WINHTTP_AUTH_SCHEME_BASIC);
-//
-//  result := 0;
-
+function THttpClient.ChooseProxyAuth(dwSupportedSchemes: DWORD): DWORD;
+begin
+  // For proxy auth, auto-select the best available scheme
+  // Try in order of preference: Negotiate > NTLM > Basic
+  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NEGOTIATE > 0 then
+    exit(WINHTTP_AUTH_SCHEME_NEGOTIATE);
+  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_NTLM > 0 then
+    exit(WINHTTP_AUTH_SCHEME_NTLM);
+  if dwSupportedSchemes and WINHTTP_AUTH_SCHEME_BASIC > 0 then
+    exit(WINHTTP_AUTH_SCHEME_BASIC);
+  result := 0;
 end;
 
 function THttpClient.ConfigureWinHttpRequest(hRequest: HINTERNET; const request: IHttpRequest): DWORD;
 var
   option : DWORD;
+  proxyInfo : TWinHttpProxyInfo;
 begin
   result := WriteHeaders(hRequest, request.Headers);
   if result <> S_OK then
@@ -236,9 +244,34 @@ begin
               SECURITY_FLAG_IGNORE_CERT_WRONG_USAGE +
               SECURITY_FLAG_IGNORE_CERT_CN_INVALID +
               SECURITY_FLAG_IGNORE_CERT_DATE_INVALID;
-    if not WinHttpSetOption(hRequest, WINHTTP_OPTION_SECURITY_FLAGS,@option,sizeof(option)) then
-      result := GetLastError;
+    if not WinHttpSetOption(hRequest, WINHTTP_OPTION_SECURITY_FLAGS, @option, sizeof(option)) then
+      exit(GetLastError);
   end;
+
+  // Apply proxy settings to request if explicit proxy is configured
+  if FProxyUrl <> '' then
+  begin
+    proxyInfo.dwAccessType := WINHTTP_ACCESS_TYPE_NAMED_PROXY;
+    proxyInfo.lpszProxy := PWideChar(FProxyUrl);
+    if FProxyBypass <> '' then
+      proxyInfo.lpszProxyBypass := PWideChar(FProxyBypass)
+    else
+      proxyInfo.lpszProxyBypass := nil;
+
+    if not WinHttpSetOption(hRequest, WINHTTP_OPTION_PROXY, @proxyInfo, SizeOf(proxyInfo)) then
+      exit(GetLastError);
+
+    // Set proxy credentials proactively if provided (avoids 407 round-trip for basic auth)
+    if FProxyUserName <> '' then
+    begin
+      if not WinHttpSetCredentials(hRequest, WINHTTP_AUTH_TARGET_PROXY, WINHTTP_AUTH_SCHEME_BASIC,
+                                   PWideChar(FProxyUserName), PWideChar(FProxyPassword), nil) then
+        exit(GetLastError);
+    end;
+  end;
+  // If FProxyUrl is empty, session default (system proxy) is used
+
+  result := S_OK;
 end;
 
 constructor THttpClient.Create(const uri : IUri);
@@ -270,9 +303,13 @@ end;
 
 procedure THttpClient.EnsureSession;
 begin
-  FSession := WinHttpOpen(PWideChar(FUserAgent), WINHTTP_ACCESS_TYPE_NO_PROXY, WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC);
   if FSession = nil then
-    RaiseLastOSError;
+  begin
+    FSession := WinHttpOpen(PWideChar(FUserAgent), WINHTTP_ACCESS_TYPE_DEFAULT_PROXY,
+                            WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, WINHTTP_FLAG_ASYNC);
+    if FSession = nil then
+      RaiseLastOSError;
+  end;
 end;
 
 
@@ -316,6 +353,11 @@ end;
 function THttpClient.GetProxyPassword: string;
 begin
   result := FProxyPassword;
+end;
+
+function THttpClient.GetProxyUrl: string;
+begin
+  result := FProxyUrl;
 end;
 
 function THttpClient.GetProxyUserName: string;
@@ -390,7 +432,7 @@ begin
     begin
       if FUserName <> '' then
       begin
-        if not WinHttpSetCredentials(hRequest, dwAuthTarget, dwAuthenticationScheme, PChar(FUserName), PChar(FPassword),nil) then
+        if WinHttpSetCredentials(hRequest, dwAuthTarget, dwAuthenticationScheme, PChar(FUserName), PChar(FPassword), nil) then
           result := S_OK
         else
           result := GetLastError;
@@ -438,7 +480,7 @@ begin
   //Resend the Proxy authentication details also if used before, otherwise we could end up in a 407-401-407-401 loop
   if FProxyAuthScheme <> 0 then
   begin
-    result := DoAuthentication(hRequest, dwAuthenticationScheme, WINHTTP_AUTH_TARGET_PROXY);
+    result := DoAuthentication(hRequest, FProxyAuthScheme, WINHTTP_AUTH_TARGET_PROXY);
     if result <> S_OK then
       exit;
   end;
@@ -468,7 +510,7 @@ begin
   if not WinHttpQueryAuthSchemes(hRequest, dwSupportedSchemes, dwFirstScheme, dwAuthTarget) then
     exit(GetLastError);
 
-  FProxyAuthScheme := ChooseAuth(dwSupportedSchemes);
+  FProxyAuthScheme := ChooseProxyAuth(dwSupportedSchemes);
   if FProxyAuthScheme = 0 then  //no supported scheme so we have no way to authenticate.
     exit(ERROR_WINHTTP_LOGIN_FAILURE);
 
@@ -761,39 +803,37 @@ begin
       FClientError := GetLastError;
       raise EHttpClientException.Create(ClientErrorToString('Error connecting', FClientError), FClientError);
     end;
-
-    option := 0;
-    if FUseHttp2 then
-      option := WINHTTP_PROTOCOL_FLAG_HTTP2;
-
-    if not WinHttpSetOption(hConnection,WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, @option, SizeOf(DWORD)) then
-    begin
-      FClientError := GetLastError;
-      raise EHttpClientException.Create(ClientErrorToString('Error setting http options', FClientError), FClientError);
-    end;
-
-    dwOpenRequestFlags := WINHTTP_FLAG_REFRESH + WINHTTP_FLAG_ESCAPE_PERCENT;
-    if urlComp.nScheme = INTERNET_SCHEME_HTTPS then
-      dwOpenRequestFlags := dwOpenRequestFlags + WINHTTP_FLAG_SECURE;
-
-    method := HttpMethodToString(request.HttpMethod);
-
-    sResource := GetResourceFromRequest(request);
-
-    hRequest := WinHttpOpenRequest(hConnection, PWideChar(method), PWideChar(sResource), PWideChar(http_version),WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES , dwOpenRequestFlags);
-    if hRequest = nil then
-    begin
-      FClientError := GetLastError;
-      raise EHttpClientException.Create(ClientErrorToString('Error opening request', FClientError), FClientError);
-    end;
-
-    if WinHttpSetTimeouts(hRequest, request.ConnectionTimeout, request.ConnectionTimeout, request.SendTimeout, request.ResponseTimeout) = False then
-      raise EHttpClientException.Create(SysErrorMessage(GetLastError), GetLastError);
-
-
-    //set timeouts on the request.
-
     try
+      option := 0;
+      if FUseHttp2 then
+        option := WINHTTP_PROTOCOL_FLAG_HTTP2;
+
+      if not WinHttpSetOption(hConnection,WINHTTP_OPTION_ENABLE_HTTP_PROTOCOL, @option, SizeOf(DWORD)) then
+      begin
+        FClientError := GetLastError;
+        raise EHttpClientException.Create(ClientErrorToString('Error setting http options', FClientError), FClientError);
+      end;
+
+      dwOpenRequestFlags := WINHTTP_FLAG_REFRESH + WINHTTP_FLAG_ESCAPE_PERCENT;
+      if urlComp.nScheme = INTERNET_SCHEME_HTTPS then
+        dwOpenRequestFlags := dwOpenRequestFlags + WINHTTP_FLAG_SECURE;
+
+      method := HttpMethodToString(request.HttpMethod);
+
+      sResource := GetResourceFromRequest(request);
+
+      hRequest := WinHttpOpenRequest(hConnection, PWideChar(method), PWideChar(sResource), PWideChar(http_version),WINHTTP_NO_REFERER,WINHTTP_DEFAULT_ACCEPT_TYPES , dwOpenRequestFlags);
+      if hRequest = nil then
+      begin
+        FClientError := GetLastError;
+        raise EHttpClientException.Create(ClientErrorToString('Error opening request', FClientError), FClientError);
+      end;
+      try
+        if WinHttpSetTimeouts(hRequest, request.ConnectionTimeout, request.ConnectionTimeout, request.SendTimeout, request.ResponseTimeout) = False then
+          raise EHttpClientException.Create(SysErrorMessage(GetLastError), GetLastError);
+
+
+        //set timeouts on the request.
       pCallback := WinHttpSetStatusCallback(hRequest, _HTTPCallback, WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS + WINHTTP_CALLBACK_FLAG_REDIRECT, 0);
 
       if Assigned(pCallBack) then
@@ -839,7 +879,10 @@ begin
       bResult := WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0, FData, FDataLength, FDataLength, NativeUInt(Pointer(Self)) );
 
       if not bResult then
-        exit;
+      begin
+        FClientError := GetLastError;
+        raise EHttpClientException.Create(ClientErrorToString('Error sending request', FClientError), FClientError);
+      end;
 
       waitRes := WaitForMultipleObjects(handleCount ,@waitHandles[0],false, INFINITE); //todo - add timeouts!
       case waitRes of
@@ -859,26 +902,26 @@ begin
         WAIT_OBJECT_1 :
         begin
           //cancellation token triggered
-            raise EHttpClientException.Create(ClientErrorToString('',FClientError), FClientError);
-
           FResponse := nil;
-          exit;
+          raise EHttpClientException.Create(ClientErrorToString('', FClientError), FClientError);
         end;
         WAIT_TIMEOUT :
         begin
           //timed out, clean up and return.
-          raise EHttpClientException.Create(ClientErrorToString('Timed out',ERROR_WINHTTP_TIMEOUT), ERROR_WINHTTP_TIMEOUT);
           FResponse := nil;
-          exit;
+          raise EHttpClientException.Create(ClientErrorToString('Timed out', ERROR_WINHTTP_TIMEOUT), ERROR_WINHTTP_TIMEOUT);
         end;
       end;
+      finally
+        WinHttpCloseHandle(hRequest);
+      end;
     finally
-      WinHttpCloseHandle(hRequest);
       WinHttpCloseHandle(hConnection);
-    end;
+   end;
   finally
     FCurrentRequest := nil;
     SetLength(FReceiveBuffer, 0);
+    SetLength(FWriteBuffer, 0);
   end;
 end;
 
@@ -906,7 +949,7 @@ end;
 
 procedure THttpClient.SetEnableTLS1_3(const value: boolean);
 begin
-  FEnableTLS1_3 := false;
+  FEnableTLS1_3 := value;
 end;
 
 procedure THttpClient.SetPassword(const value: string);
@@ -917,6 +960,21 @@ end;
 procedure THttpClient.SetProxyPassword(const value: string);
 begin
   FProxyPassword := value;
+end;
+
+procedure THttpClient.SetProxyUrl(const value: string);
+begin
+  FProxyUrl := value;
+end;
+
+procedure THttpClient.SetProxyBypass(const value: string);
+begin
+  FProxyBypass := value;
+end;
+
+function THttpClient.GetProxyBypass: string;
+begin
+  result := FProxyBypass;
 end;
 
 procedure THttpClient.SetProxyUserName(const value: string);
@@ -991,7 +1049,6 @@ end;
 function THttpClient.WriteData(hRequest: HINTERNET; position : DWORD): boolean;
 var
   stream : TStream;
-  buffer : TBytes;
   size : Int64;
   bufferSize : DWORD;
 begin
@@ -1002,13 +1059,12 @@ begin
 
   bufferSize := Min(1024*1024, size);
 
-  SetLength(buffer,bufferSize + 2);
-  ZeroMemory(@buffer[0], bufferSize);
+  SetLength(FWriteBuffer, bufferSize + 2);
+  ZeroMemory(@FWriteBuffer[0], bufferSize);
 
-  streamReadBuffer(stream, buffer, position, bufferSize);
+  streamReadBuffer(stream, FWriteBuffer, position, bufferSize);
 
-  result := WinHttpWriteData(hRequest, buffer, bufferSize, nil);
-
+  result := WinHttpWriteData(hRequest, FWriteBuffer, bufferSize, nil);
 end;
 
 function THttpClient.WriteHeaders(hRequest: HINTERNET; const headers: TStrings): DWORD;

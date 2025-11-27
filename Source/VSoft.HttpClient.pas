@@ -179,19 +179,6 @@ type
     function GetUri : IUri;
   end;
 
-  THttpClientBase = class(TInterfacedObject)
-  protected
-    FConnectionTimeout: Integer;
-    FSendTimeout: Integer;
-    FResponseTimeout: Integer;
-  public
-    property ConnectionTimeout: Integer read FConnectionTimeout write FConnectionTimeout;
-    property SendTimeout: Integer read FSendTimeout write FSendTimeout;
-    property ResponseTimeout: Integer read FResponseTimeout write FResponseTimeout;
-  end;
-
-
-
 
   TUseSerializerFunc = reference to function : IRestSerializer;
 
@@ -230,6 +217,11 @@ type
     function GetProxyPassword : string;
     procedure SetProxyPassword(const value : string);
 
+    function GetProxyUrl : string;
+    procedure SetProxyUrl(const value : string);
+
+    function GetProxyBypass : string;
+    procedure SetProxyBypass(const value : string);
 
     function GetConnectionTimeout : integer;
     procedure SetConnectionTimeout(const value : integer);
@@ -260,8 +252,11 @@ type
     property UserAgent  : string read GetUserAgent write SetUserAgent;
     property UserName  : string read GetUserName write SetUserName;
     property Password : string read GetPassword write SetPassword;
+
     property ProxyUserName : string read GetProxyUserName write SetProxyUserName;
     property ProxyPassword : string read GetProxyPassword write SetProxyPassword;
+    property ProxyUrl : string read GetProxyUrl write SetProxyUrl;
+    property ProxyBypass : string read GetProxyBypass write SetProxyBypass;
 
     property ConnectionTimeout: Integer read GetConnectionTimeout write SetConnectionTimeout;
     property SendTimeout: Integer read GetSendTimeout write SetSendTimeout;

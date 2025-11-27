@@ -141,7 +141,10 @@ end;
 
 function THttpResponse.GetContentLength: Int64;
 begin
-  result := FStream.Size; //or should we use the header.
+  if FStream <> nil then
+    result := FStream.Size
+  else
+    result := 0;
 end;
 
 function THttpResponse.GetContentType: string;
@@ -157,9 +160,12 @@ end;
 function THttpResponse.GetFileName: string;
 begin
   if FFileName <> '' then
-    result :=  FFileName
+    result := FFileName
   else if FContentDisposition <> nil then
-    FFileName := FContentDisposition.FileName
+  begin
+    FFileName := FContentDisposition.FileName;
+    result := FFileName;
+  end
   else
     result := '';
 end;
@@ -185,6 +191,9 @@ function THttpResponse.GetResponse: string;
 var
   textStream : TStringStream;
 begin
+  result := '';
+  if FStream = nil then
+    exit;
   if GetIsStringResponse then
   begin
     textStream := TStringStream.Create('', TEncoding.UTF8);
@@ -195,9 +204,7 @@ begin
     finally
       textStream.Free;
     end;
-  end
-  else
-    result := ''; //should we raise instead.
+  end;
 end;
 
 function THttpResponse.GetResponseStream: TStream;
@@ -269,7 +276,7 @@ end;
 
 function THttpResponse.IsSuccess: boolean;
 begin
-  result := FStatusCode = 200;
+  result := (FStatusCode >= 200) and (FStatusCode < 300);
 end;
 
 procedure THttpResponse.SaveTo(const folderName, fileName: string);
