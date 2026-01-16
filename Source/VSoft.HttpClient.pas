@@ -312,6 +312,8 @@ const
   cLastModifiedHeader = 'Last-Modified';
   cUserAgentHeader = 'User-Agent';
 
+function UrlEncode(const value: string): string;
+
 implementation
 
 uses
@@ -319,6 +321,24 @@ uses
   VSoft.WinHttp.Api,
   VSoft.HttpClient.WinHttpClient,
   VSoft.HttpClient.MultipartFormData;
+
+function UrlEncode(const value: string): string;
+var
+  i: Integer;
+  ch: Char;
+begin
+  result := '';
+  for i := 1 to Length(value) do
+  begin
+    ch := value[i];
+    if CharInSet(ch, ['A'..'Z', 'a'..'z', '0'..'9', '-', '_', '.', '~']) then
+      result := result + ch
+    else if ch = ' ' then
+      result := result + '+'
+    else
+      result := result + '%' + IntToHex(Ord(ch), 2);
+  end;
+end;
 
 function ClientErrorToString(const message : string; const value : HRESULT) : string;
 begin

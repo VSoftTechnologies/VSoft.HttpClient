@@ -294,8 +294,7 @@ begin
     begin
       if i > 0 then
         sBody := sBody + '&';
-      //seems like winhttp does the encoding for us??
-      sBody := sBody + FRequestParams.Names[i] + '=' + FRequestParams.ValueFromIndex[i];
+      sBody := sBody + UrlEncode(FRequestParams.Names[i]) + '=' + UrlEncode(FRequestParams.ValueFromIndex[i]);
     end;
 
     FContent := TStringStream.Create(sBody, TEncoding.UTF8);

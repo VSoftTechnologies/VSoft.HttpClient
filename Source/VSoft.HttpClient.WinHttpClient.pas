@@ -49,7 +49,7 @@ type
 
     FData : Pointer;
     FDataLength : DWORD;
-
+    FRequestLock : TCriticalSection;
 
   protected
     procedure OnHTTPCallback(hInternet: HINTERNET; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD);
@@ -154,15 +154,25 @@ const cReceiveBufferSize : DWORD = 32 * 1024;
 //type
 //  TRequestCracker = class(TRequest);
 
-
 procedure _HTTPCallback(hInternet: HINTERNET; dwContext: Pointer; dwInternetStatus: DWORD; lpvStatusInformation: Pointer; dwStatusInformationLength: DWORD); stdcall;
 var
   client : THttpClient;
 begin
   client := THttpClient(dwContext);
   if client <> nil then
-    client.OnHTTPCallback(hInternet, dwInternetStatus, lpvStatusInformation, dwStatusInformationLength);
-
+  begin
+    try
+      client.OnHTTPCallback(hInternet, dwInternetStatus, lpvStatusInformation, dwStatusInformationLength);
+    except
+      on E: Exception do
+      begin
+        // Catch exceptions to prevent crash in callback thread
+        // Set error and signal completion so main thread can handle
+        client.FClientError := ERROR_INVALID_FUNCTION;
+        client.FWaitEvent.SetEvent;
+      end;
+    end;
+  end;
 end;
 
 function THttpClient.CreateRequest(const resource: string): IHttpRequest;
@@ -223,7 +233,7 @@ var
   proxyInfo : TWinHttpProxyInfo;
 begin
   result := WriteHeaders(hRequest, request.Headers);
-  if result <> S_OK then
+  if result <> ERROR_SUCCESS then
     exit;
 
   //it's a rest client, we don't want to send cookies
@@ -271,14 +281,15 @@ begin
   end;
   // If FProxyUrl is empty, session default (system proxy) is used
 
-  result := S_OK;
+  result := ERROR_SUCCESS;
 end;
 
 constructor THttpClient.Create(const uri : IUri);
 begin
   FUri := uri;
   FUserAgent := 'VSoft.HttpClient';
-  FWaitEvent := TEvent.Create(nil,false, false,'');
+  FWaitEvent := TEvent.Create(nil, false, false, '');
+  FRequestLock := TCriticalSection.Create;
   FEnableTLS1_3 := false;
 end;
 
@@ -297,6 +308,7 @@ begin
   if FSession <> nil then
     WinHttpCloseHandle(FSession);
   FWaitEvent.Free;
+  FRequestLock.Free;
 
   inherited;
 end;
@@ -389,7 +401,7 @@ begin
         result := result + '?'
       else
         result := result + '&';
-      result := result + request.Parameters.Names[i] + '=' + request.Parameters.ValueFromIndex[i];
+      result := result + UrlEncode(request.Parameters.Names[i]) + '=' + UrlEncode(request.Parameters.ValueFromIndex[i]);
     end;
   end;
 end;
@@ -433,7 +445,7 @@ begin
       if FUserName <> '' then
       begin
         if WinHttpSetCredentials(hRequest, dwAuthTarget, dwAuthenticationScheme, PChar(FUserName), PChar(FPassword), nil) then
-          result := S_OK
+          result := ERROR_SUCCESS
         else
           result := GetLastError;
       end;
@@ -444,7 +456,7 @@ begin
       if FProxyUserName <> '' then
       begin
         if WinHttpSetCredentials(hRequest, dwAuthTarget, dwAuthenticationScheme, PChar(FProxyUserName), PChar(FProxyPassword),nil) then
-          result := S_OK
+          result := ERROR_SUCCESS
         else
           result := GetLastError;
       end;
@@ -474,14 +486,14 @@ begin
     exit(ERROR_WINHTTP_LOGIN_FAILURE);
 
   result := DoAuthentication(hRequest, dwAuthenticationScheme, dwAuthTarget);
-  if result <> S_OK then
+  if result <> ERROR_SUCCESS then
     exit;
 
   //Resend the Proxy authentication details also if used before, otherwise we could end up in a 407-401-407-401 loop
   if FProxyAuthScheme <> 0 then
   begin
     result := DoAuthentication(hRequest, FProxyAuthScheme, WINHTTP_AUTH_TARGET_PROXY);
-    if result <> S_OK then
+    if result <> ERROR_SUCCESS then
       exit;
   end;
 
@@ -493,7 +505,7 @@ begin
   if not WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0, FData, FDataLength, FDataLength, NativeUInt(Pointer(Self))) then
     result := GetLastError
   else
-    result := S_OK;
+    result := ERROR_SUCCESS;
 
 end;
 
@@ -515,7 +527,7 @@ begin
     exit(ERROR_WINHTTP_LOGIN_FAILURE);
 
   result := DoAuthentication(hRequest, FProxyAuthScheme, dwAuthTarget);
-  if result <> S_OK then
+  if result <> ERROR_SUCCESS then
     exit;
 
   FLastStatusCode := HTTP_STATUS_PROXY_AUTH_REQ;
@@ -526,7 +538,7 @@ begin
   if not WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0, FData, FDataLength, FDataLength, NativeUInt(Pointer(Self))) then
     result := GetLastError
   else
-    result := S_OK;
+    result := ERROR_SUCCESS;
 
 
 end;
@@ -536,7 +548,7 @@ var
   statusCodeSize : DWORD;
 begin
   statusCodeSize := Sizeof(DWORD);
-  result := S_OK;
+  result := ERROR_SUCCESS;
   if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE + WINHTTP_QUERY_FLAG_NUMBER, WINHTTP_HEADER_NAME_BY_INDEX, @statusCode, statusCodeSize, WINHTTP_NO_HEADER_INDEX) then
     result := GetLastError;
 end;
@@ -549,18 +561,22 @@ var
   lastError : DWORD;
 begin
   result := QueryStatusCode(hRequest, statusCode);
-  if result <> S_OK then
+  if result <> ERROR_SUCCESS then
     exit;
   FLastStatusCode := statusCode;
   FResponse.SetStatusCode(statusCode);
   if statusCode = HTTP_STATUS_PROXY_AUTH_REQ then
-    HandleProxyAuthResponse(hRequest)
+  begin
+    result := HandleProxyAuthResponse(hRequest);
+    // Exit regardless - either error occurred or new request was sent
+    exit;
+  end
   else if statusCode = HTTP_STATUS_DENIED then
-    HandleAccessDeniedResponse(hRequest);
-//  else if ((statusCode div 100) <> 2) then //any 2xx is good
-//    exit(ERROR_WINHTTP_INVALID_HEADER);
-
-  FLastStatusCode := statusCode;
+  begin
+    result := HandleAccessDeniedResponse(hRequest);
+    // Exit regardless - either error occurred or new request was sent
+    exit;
+  end;
 
 
   if not WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_RAW_HEADERS_CRLF, WINHTTP_HEADER_NAME_BY_INDEX, nil, bufferSize, WINHTTP_NO_HEADER_INDEX) then
@@ -597,7 +613,7 @@ begin
     WINHTTP_CALLBACK_STATUS_HEADERS_AVAILABLE :
     begin
       FClientError := OnHeadersAvailable(hInternet, dwInternetStatus, lpvStatusInformation, dwStatusInformationLength);
-      if FClientError <> S_OK then
+      if FClientError <> ERROR_SUCCESS then
         FWaitEvent.SetEvent; //unblock
     end;
 
@@ -748,16 +764,16 @@ var
   method : string;
 
   stream : TStream;
-  buffer : TBytes;
   bufferSize : DWORD;
 
   sResource : string;
   hr : DWORD;
   tlsProtocols : DWORD;
+  waitTimeout : DWORD;
 
 
 begin
-  if FCurrentRequest <> nil then
+  if not FRequestLock.TryEnter then
     raise Exception.Create('A request is in progress.. winhttp is not reentrant!');
   try
     result := nil;
@@ -842,7 +858,7 @@ begin
       FDataLength := request.ContentLength;    //need to do this before configurerequest as if there are files it will set the content type.
 
       hr := ConfigureWinHttpRequest(hRequest, request);
-      if hr <> S_OK then
+      if hr <> ERROR_SUCCESS then
         raise Exception.Create('Could not configure request : ' + SysErrorMessage(GetLastError) );
 
       handleCount := 1;
@@ -858,15 +874,15 @@ begin
       begin
         stream := FCurrentRequest.GetBody;
         bufferSize := FCurrentRequest.GetContentLength;
-        SetLength(buffer,bufferSize);
-        ZeroMemory(@buffer[0], bufferSize);
+        SetLength(FWriteBuffer, bufferSize);
+        ZeroMemory(@FWriteBuffer[0], bufferSize);
         {$IF CompilerVersion > 25.0} //XE5+
-        stream.ReadBuffer(buffer,0 , bufferSize);
+        stream.ReadBuffer(FWriteBuffer, 0, bufferSize);
         {$ELSE}
-        stream.ReadBuffer(buffer[0], bufferSize);
+        stream.ReadBuffer(FWriteBuffer[0], bufferSize);
         {$IFEND}
-        FData := @buffer[0];
-        FBytesWritten := FDataLength;
+        FData := @FWriteBuffer[0];
+        FBytesWritten := FDataLength;  // Data sent inline with WinHttpSendRequest
       end
       else
       begin
@@ -884,7 +900,11 @@ begin
         raise EHttpClientException.Create(ClientErrorToString('Error sending request', FClientError), FClientError);
       end;
 
-      waitRes := WaitForMultipleObjects(handleCount ,@waitHandles[0],false, INFINITE); //todo - add timeouts!
+      if request.ResponseTimeout > 0 then
+        waitTimeout := DWORD(request.ResponseTimeout)
+      else
+        waitTimeout := INFINITE;
+      waitRes := WaitForMultipleObjects(handleCount, @waitHandles[0], false, waitTimeout);
       case waitRes of
         WAIT_OBJECT_0 :
         begin
@@ -901,9 +921,9 @@ begin
         end;
         WAIT_OBJECT_1 :
         begin
-          //cancellation token triggered
+          //cancellation token triggered - hRequest will be closed in finally block
           FResponse := nil;
-          raise EHttpClientException.Create(ClientErrorToString('', FClientError), FClientError);
+          raise EHttpClientException.Create('Request cancelled', ERROR_WINHTTP_OPERATION_CANCELLED);
         end;
         WAIT_TIMEOUT :
         begin
@@ -922,6 +942,7 @@ begin
     FCurrentRequest := nil;
     SetLength(FReceiveBuffer, 0);
     SetLength(FWriteBuffer, 0);
+    FRequestLock.Leave;
   end;
 end;
 
@@ -1073,7 +1094,7 @@ var
   i: Integer;
   sCharSet : string;
 begin
-  result := S_OK;
+  result := ERROR_SUCCESS;
   if headers.Count = 0 then
     exit;
 

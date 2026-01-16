@@ -775,6 +775,8 @@ procedure TMultipartFormData.AddFile(const fieldName, filePath, contentType: str
 var
   fs : TFileStream;
 begin
+  if not FileExists(filePath) then
+    raise EArgumentException.Create('File not found: ' + filePath);
   fs := TFileStream.Create(filePath, fmOpenRead or fmShareDenyWrite);
   try
     AddStream(fieldName, fs, ExtractFileName(filePath), contentType);

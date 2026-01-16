@@ -114,7 +114,11 @@ begin
   FFileName := fileName;
   //TODO : if contentdisposition says it's a file, create a temp filestream.
   if fileName <> '' then
-    FStream := TFileStream.Create(fileName, fmCreate)
+  begin
+    if not DirectoryExists(ExtractFilePath(fileName)) then
+      ForceDirectories(ExtractFilePath(fileName));
+    FStream := TFileStream.Create(fileName, fmCreate);
+  end
   else
     FStream := TMemoryStream.Create;
 end;
