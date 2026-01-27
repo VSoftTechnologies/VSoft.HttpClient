@@ -22,6 +22,7 @@ type
     FConnectionTimeout: Integer;
     FSendTimeout: Integer;
     FResponseTimeout: Integer;
+    FMaxResponseSize: Int64;
 
     FSession : HINTERNET;
     FUserAgent : string;
@@ -43,6 +44,7 @@ type
     FClientError : DWORD;
     FUseHttp2 : boolean;
     FEnableTLS1_3 : boolean;
+    FEnableCertificateRevocationCheck : boolean;
     FAllowSelfSignedCertificates : boolean;
     FLastStatusCode : DWORD;
     FProxyAuthScheme : DWORD;
@@ -101,6 +103,8 @@ type
     function GetEnableTLS1_3 : boolean;
     procedure SetEnableTLS1_3(const value : boolean);
 
+    function GetEnableCertificateRevocationCheck : boolean;
+    procedure SetEnableCertificateRevocationCheck(const value : boolean);
 
     function GetConnectionTimeout : integer;
     procedure SetConnectionTimeout(const value : integer);
@@ -111,7 +115,8 @@ type
     function GetResponseTimeout : integer;
     procedure SetResponseTimeout(const value : integer);
 
-
+    function GetMaxResponseSize : Int64;
+    procedure SetMaxResponseSize(const value : Int64);
 
     function CreateRequest(const resource : string) : IHttpRequest;overload;
     function CreateRequest(const uri : IUri) : IHttpRequest;overload;
@@ -241,10 +246,29 @@ begin
   if not WinHttpSetOption(hRequest, WINHTTP_OPTION_DISABLE_FEATURE, @option, sizeof(option)) then
     exit(GetLastError);
 
+  // Handle redirect policy
   if not request.FollowRedirects then
   begin
     option := WINHTTP_DISABLE_REDIRECTS;
     if not WinHttpSetOption(hRequest, WINHTTP_OPTION_DISABLE_FEATURE, @option, sizeof(option)) then
+      exit(GetLastError);
+  end
+  else
+  begin
+    // Set redirect policy based on AllowHttpDowngrade setting
+    if request.AllowHttpDowngrade then
+      option := WINHTTP_OPTION_REDIRECT_POLICY_ALWAYS
+    else
+      option := WINHTTP_OPTION_REDIRECT_POLICY_DISALLOW_HTTPS_TO_HTTP;
+    if not WinHttpSetOption(hRequest, WINHTTP_OPTION_REDIRECT_POLICY, @option, sizeof(option)) then
+      exit(GetLastError);
+  end;
+
+  // Enable certificate revocation checking if requested
+  if FEnableCertificateRevocationCheck then
+  begin
+    option := WINHTTP_ENABLE_SSL_REVOCATION;
+    if not WinHttpSetOption(hRequest, WINHTTP_OPTION_ENABLE_FEATURE, @option, sizeof(option)) then
       exit(GetLastError);
   end;
 
@@ -845,6 +869,10 @@ begin
         raise EHttpClientException.Create(ClientErrorToString('Error opening request', FClientError), FClientError);
       end;
       try
+        // Validate timeout values - WinHttp requires non-negative timeouts (0 means infinite)
+        // Negative values are invalid
+        if (request.ConnectionTimeout < 0) or (request.SendTimeout < 0) or (request.ResponseTimeout < 0) then
+          raise EHttpClientException.Create('Timeout values must be non-negative', ERROR_INVALID_PARAMETER);
         if WinHttpSetTimeouts(hRequest, request.ConnectionTimeout, request.ConnectionTimeout, request.SendTimeout, request.ResponseTimeout) = False then
           raise EHttpClientException.Create(SysErrorMessage(GetLastError), GetLastError);
 
@@ -891,6 +919,7 @@ begin
       end;
 
       FResponse := THttpResponse.Create(0,'','',request.SaveAsFile); //for now
+      FResponse.SetMaxResponseSize(FMaxResponseSize);
 
       bResult := WinHttpSendRequest(hRequest,WINHTTP_NO_ADDITIONAL_HEADERS,0, FData, FDataLength, FDataLength, NativeUInt(Pointer(Self)) );
 
@@ -973,6 +1002,16 @@ begin
   FEnableTLS1_3 := value;
 end;
 
+function THttpClient.GetEnableCertificateRevocationCheck: boolean;
+begin
+  result := FEnableCertificateRevocationCheck;
+end;
+
+procedure THttpClient.SetEnableCertificateRevocationCheck(const value: boolean);
+begin
+  FEnableCertificateRevocationCheck := value;
+end;
+
 procedure THttpClient.SetPassword(const value: string);
 begin
   FPassword := value;
@@ -1006,6 +1045,16 @@ end;
 procedure THttpClient.SetResponseTimeout(const value: integer);
 begin
   FResponseTimeout := value;
+end;
+
+function THttpClient.GetMaxResponseSize: Int64;
+begin
+  result := FMaxResponseSize;
+end;
+
+procedure THttpClient.SetMaxResponseSize(const value: Int64);
+begin
+  FMaxResponseSize := value;
 end;
 
 procedure THttpClient.SetSendTimeout(const value: integer);

@@ -899,8 +899,18 @@ begin
 end;
 
 procedure TMultipartFormData.GenerateUniqueBoundry;
+var
+  guid: TGUID;
+  guidStr: string;
 begin
-  FBoundary := '-----------' + FormatDateTime('mmddyyhhnnsszzz', Now) + '-----------';
+  // Use GUID for cryptographically random boundary instead of timestamp
+  CreateGUID(guid);
+  guidStr := GUIDToString(guid);
+  // Remove braces and hyphens from GUID string for cleaner boundary
+  guidStr := StringReplace(guidStr, '{', '', [rfReplaceAll]);
+  guidStr := StringReplace(guidStr, '}', '', [rfReplaceAll]);
+  guidStr := StringReplace(guidStr, '-', '', [rfReplaceAll]);
+  FBoundary := '-----------' + guidStr + '-----------';
 end;
 
 function TMultipartFormData.GetBoundary: string;

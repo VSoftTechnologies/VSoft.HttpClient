@@ -35,6 +35,7 @@ type
     FEncoding : TEncoding;
     FForceFormData : boolean;
 	  FFollowRedirects : boolean;
+    FAllowHttpDowngrade : boolean;
 
     FConnectionTimeout: Integer;
     FSendTimeout: Integer;
@@ -52,6 +53,7 @@ type
     function GetAcceptEncoding: string;
     function GetAcceptLanguage: string;
     function GetFollowRedirects : boolean;
+    function GetAllowHttpDowngrade : boolean;
     function GetHttpMethod : THttpMethod;
     function GetSaveAsFile : string;
     function GetResource : string;
@@ -66,6 +68,7 @@ type
     procedure SetAcceptLanguage(const value: string);
     procedure SetContentType(const value: string);
     procedure SetFollowRedirects(value : boolean);
+    procedure SetAllowHttpDowngrade(value : boolean);
     procedure SetHttpMethod(value : THttpMethod);
     procedure SetSaveAsFile(const value : string);
     procedure SetResource(const value : string);
@@ -131,6 +134,7 @@ type
     property ContentType    : string read GetContentType write SetContentType;
 
     property FollowRedirects : boolean read FFollowRedirects write FFollowRedirects;
+    property AllowHttpDowngrade : boolean read FAllowHttpDowngrade write FAllowHttpDowngrade;
     property HtttpMethod : THttpMethod read FHttpMethod write FHttpMethod;
     property Resource    : string read GetResource write SetResource;
     property ContentLength : Int64 read GetContentLength;
@@ -163,6 +167,7 @@ begin
   FRequestParams := TStringList.Create;
   FUrlSegments := TStringList.Create;
   FFollowRedirects := true;
+  FAllowHttpDowngrade := false;
 
   if Length(uri.QueryParams) > 0 then
   begin
@@ -343,6 +348,11 @@ begin
   result := FFollowRedirects;
 end;
 
+function TRequest.GetAllowHttpDowngrade: boolean;
+begin
+  result := FAllowHttpDowngrade;
+end;
+
 function TRequest.GetHeaders: TStrings;
 begin
   result := FHeaders;
@@ -419,6 +429,11 @@ end;
 procedure TRequest.SetFollowRedirects(value: boolean);
 begin
   FFollowRedirects := value;
+end;
+
+procedure TRequest.SetAllowHttpDowngrade(value: boolean);
+begin
+  FAllowHttpDowngrade := value;
 end;
 
 procedure TRequest.SetHttpMethod(value: THttpMethod);

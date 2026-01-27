@@ -77,6 +77,7 @@ type
     function GetAcceptEncoding: string;
     function GetAcceptLanguage: string;
     function GetFollowRedirects : boolean;
+    function GetAllowHttpDowngrade : boolean;
     function GetHttpMethod : THttpMethod;
     function GetSaveAsFile : string;
     function GetResource : string;
@@ -91,6 +92,7 @@ type
     procedure SetAcceptLanguage(const value: string);
     procedure SetContentType(const value: string);
     procedure SetFollowRedirects(value : boolean);
+    procedure SetAllowHttpDowngrade(value : boolean);
     procedure SetHttpMethod(value : THttpMethod);
     procedure SetSaveAsFile(const value : string);
     procedure SetResource(const value : string);
@@ -151,6 +153,7 @@ type
     property ContentType    : string read GetContentType write SetContentType;
 
     property FollowRedirects : boolean read GetFollowRedirects write SetFollowRedirects;
+    property AllowHttpDowngrade : boolean read GetAllowHttpDowngrade write SetAllowHttpDowngrade;
     property HttpMethod : THttpMethod read GetHttpMethod write SetHttpMethod;
     property Resource    : string read GetResource write SetResource;
     property ContentLength : Int64 read GetContentLength;
@@ -204,6 +207,8 @@ type
     function GetEnableTLS1_3 : boolean;
     procedure SetEnableTLS1_3(const value : boolean);
 
+    function GetEnableCertificateRevocationCheck : boolean;
+    procedure SetEnableCertificateRevocationCheck(const value : boolean);
 
     function GetUserName : string;
     procedure SetUserName(const value : string);
@@ -231,6 +236,9 @@ type
 
     function GetResponseTimeout : integer;
     procedure SetResponseTimeout(const value : integer);
+
+    function GetMaxResponseSize : Int64;
+    procedure SetMaxResponseSize(const value : Int64);
 
     function CreateRequest(const resource : string) : IHttpRequest;overload;
     function CreateRequest(const uri : IUri) : IHttpRequest;overload;
@@ -261,10 +269,12 @@ type
     property ConnectionTimeout: Integer read GetConnectionTimeout write SetConnectionTimeout;
     property SendTimeout: Integer read GetSendTimeout write SetSendTimeout;
     property ResponseTimeout: Integer read GetResponseTimeout write SetResponseTimeout;
+    property MaxResponseSize : Int64 read GetMaxResponseSize write SetMaxResponseSize;
 
 
     property UseHttp2   : boolean read GetUseHttp2 write SetUseHttp2;
     property EnableTLS1_3 : boolean read GetEnableTLS1_3 write SetEnableTLS1_3;
+    property EnableCertificateRevocationCheck : boolean read GetEnableCertificateRevocationCheck write SetEnableCertificateRevocationCheck;
 
   end;
 
@@ -324,19 +334,27 @@ uses
 
 function UrlEncode(const value: string): string;
 var
+  utf8Bytes: TBytes;
   i: Integer;
-  ch: Char;
+  b: Byte;
 begin
   result := '';
-  for i := 1 to Length(value) do
+  utf8Bytes := TEncoding.UTF8.GetBytes(value);
+  for i := 0 to Length(utf8Bytes) - 1 do
   begin
-    ch := value[i];
-    if CharInSet(ch, ['A'..'Z', 'a'..'z', '0'..'9', '-', '_', '.', '~']) then
-      result := result + ch
-    else if ch = ' ' then
+    b := utf8Bytes[i];
+    if (b >= Ord('A')) and (b <= Ord('Z')) then
+      result := result + Char(b)
+    else if (b >= Ord('a')) and (b <= Ord('z')) then
+      result := result + Char(b)
+    else if (b >= Ord('0')) and (b <= Ord('9')) then
+      result := result + Char(b)
+    else if (b = Ord('-')) or (b = Ord('_')) or (b = Ord('.')) or (b = Ord('~')) then
+      result := result + Char(b)
+    else if b = Ord(' ') then
       result := result + '+'
     else
-      result := result + '%' + IntToHex(Ord(ch), 2);
+      result := result + '%' + IntToHex(b, 2);
   end;
 end;
 

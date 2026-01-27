@@ -40,6 +40,7 @@ type
     procedure SetContent(const stream : TStream);
     procedure SetHeaders(const rawHeaders : string);
     procedure SetStatusCode(const value : integer);
+    procedure SetMaxResponseSize(const value : Int64);
     procedure WriteBuffer(const buffer : TBytes; const length : NativeInt);
     procedure FinalizeContent; //closes filestream;
   end;
@@ -52,6 +53,8 @@ type
     FFileName : string;
     FErrorMessage : string;
     FContentDisposition : IContentDisposition;
+    FMaxResponseSize : Int64;
+    FTotalBytesReceived : Int64;
   protected
 
 
@@ -73,6 +76,7 @@ type
     procedure SetHeaders(const rawHeaders : string);
     procedure SetContent(const stream: TStream);
     procedure SetStatusCode(const value : integer);
+    procedure SetMaxResponseSize(const value : Int64);
     procedure WriteBuffer(const buffer : TBytes; const length : NativeInt);
     procedure FinalizeContent; //closes filestream;
 
@@ -85,6 +89,7 @@ type
 implementation
 
 uses
+  WinApi.Windows,
   System.IOUtils,
   System.StrUtils,
   VSoft.HttpClient.Headers;
@@ -186,8 +191,10 @@ end;
 
 function THttpResponse.GetIsStringResponse: Boolean;
 begin
+  // If there's a Content-Disposition with a filename, it's a file download (not a string response)
+  // Otherwise, assume it's a string response
   result := true;
-  if (FContentDisposition <> nil) and (FContentDisposition.FileName = '') then
+  if (FContentDisposition <> nil) and (FContentDisposition.FileName <> '') then
     result := false;
 end;
 
@@ -372,15 +379,24 @@ begin
   FStatusCode := value;
 end;
 
+procedure THttpResponse.SetMaxResponseSize(const value: Int64);
+begin
+  FMaxResponseSize := value;
+end;
+
 procedure THttpResponse.WriteBuffer(const buffer: TBytes; const length : NativeInt);
 begin
   if FStream = nil then
     exit;
+  // Check if we would exceed the max response size (0 means unlimited)
+  if (FMaxResponseSize > 0) and ((FTotalBytesReceived + length) > FMaxResponseSize) then
+    raise EHttpClientException.Create('Response size exceeds maximum allowed size', ERROR_INSUFFICIENT_BUFFER);
   {$IF CompilerVersion > 23.0} //XE3+
     FStream.WriteData(buffer, length);
   {$ELSE}
     FStream.WriteBuffer(buffer[0], length);
   {$IFEnd}
+  Inc(FTotalBytesReceived, length);
 end;
 
 end.
