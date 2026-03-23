@@ -595,7 +595,7 @@ begin
     // Exit regardless - either error occurred or new request was sent
     exit;
   end
-  else if statusCode = HTTP_STATUS_DENIED then
+  else if (statusCode = HTTP_STATUS_DENIED) and (FAuthTyp <> THttpAuthType.None) then
   begin
     result := HandleAccessDeniedResponse(hRequest);
     // Exit regardless - either error occurred or new request was sent
