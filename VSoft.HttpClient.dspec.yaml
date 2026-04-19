@@ -14,7 +14,7 @@ metadata:
   copyright: Vincent Parrett and contributors
   tags: [ WinHttp, http, client, rest ]
   version: 2.6.0
-  repositoryCommit: Id:e3d5164515130ae65955c3bb93975e76fe2a5c4d
+  repositoryCommit: #HASH#
 
 # define variable defaults - can be overriden in targetPlatforms
 variables:
