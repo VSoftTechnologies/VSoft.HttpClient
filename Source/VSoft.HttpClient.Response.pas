@@ -377,6 +377,10 @@ end;
 procedure THttpResponse.SetStatusCode(const value: integer);
 begin
   FStatusCode := value;
+  if IsSuccess then
+    FErrorMessage := ''
+  else
+    FErrorMessage := HttpResultString;
 end;
 
 procedure THttpResponse.SetMaxResponseSize(const value: Int64);
