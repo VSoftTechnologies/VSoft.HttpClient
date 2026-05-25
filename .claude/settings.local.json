@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"I:\\Github\\VSoftTechnologies\\VSoft.HttpClient\\Source\" /s /b *.pas)",
+      "Bash(dir /s /b *.pas)",
+      "WebSearch"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
