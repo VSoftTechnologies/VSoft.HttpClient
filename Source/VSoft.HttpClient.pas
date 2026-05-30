@@ -243,6 +243,11 @@ type
     function CreateRequest(const resource : string) : IHttpRequest;overload;
     function CreateRequest(const uri : IUri) : IHttpRequest;overload;
 
+    //Returns the fully assembled request url (base uri + resource + encoded query string).
+    //Useful for logging the exact url that will be sent - the query parameters are not part
+    //of the resource until they are assembled and encoded here.
+    function GetRequestUrl(const request : IHttpRequest) : string;
+
     procedure UseSerializer(const useFunc : TUseSerializerFunc);overload;
     procedure UseSerializer(const serializer : IRestSerializer);overload;
 

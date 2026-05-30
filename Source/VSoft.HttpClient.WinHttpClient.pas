@@ -127,6 +127,7 @@ type
 
 
     function GetResourceFromRequest(const request : IHttpRequest) : string;
+    function GetRequestUrl(const request : IHttpRequest) : string;
 
 
     function Send(const request : IHttpRequest; const cancellationToken : ICancellationToken = nil) : IHttpResponse;
@@ -428,6 +429,12 @@ begin
       result := result + UrlEncode(request.Parameters.Names[i]) + '=' + UrlEncode(request.Parameters.ValueFromIndex[i]);
     end;
   end;
+end;
+
+function THttpClient.GetRequestUrl(const request : IHttpRequest) : string;
+begin
+  //base uri + resource (with the encoded query string assembled in GetResourceFromRequest)
+  result := FUri.BaseUriString + GetResourceFromRequest(request);
 end;
 
 function THttpClient.GetResponseTimeout: integer;
@@ -854,7 +861,10 @@ begin
         raise EHttpClientException.Create(ClientErrorToString('Error setting http options', FClientError), FClientError);
       end;
 
-      dwOpenRequestFlags := WINHTTP_FLAG_REFRESH + WINHTTP_FLAG_ESCAPE_PERCENT;
+      //We url encode parameters ourselves (see GetResourceFromRequest), so tell WinHttp not to
+      //escape the url - otherwise it re-escapes our %XX sequences (e.g. %5B -> %255B), which
+      //double encodes the query and the server rejects it as a bad request.
+      dwOpenRequestFlags := WINHTTP_FLAG_REFRESH + WINHTTP_FLAG_ESCAPE_DISABLE + WINHTTP_FLAG_ESCAPE_DISABLE_QUERY;
       if urlComp.nScheme = INTERNET_SCHEME_HTTPS then
         dwOpenRequestFlags := dwOpenRequestFlags + WINHTTP_FLAG_SECURE;
 
