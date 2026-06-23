@@ -13,7 +13,7 @@ metadata:
   readme: README.md
   copyright: Vincent Parrett and contributors
   tags: [WinHttp, http, client, rest]
-  version: 2.8.0
+  version: 2.8.1
   repositoryCommit: #HASH#
 
 # define variable defaults - can be overriden in targetPlatforms
