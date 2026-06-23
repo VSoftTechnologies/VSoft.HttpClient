@@ -1,188 +1,44 @@
-{
- "metadata": {
-  "id": "VSoft.HttpClient",
-  "version": "2.6.1",
-  "description": "WinHttp base http client",
-  "authors": "Vincent Parrett",
-  "projectUrl": "https://github.com/VSoftTechnologies/VSoft.HttpClient",
-  "repositoryUrl": "https://github.com/VSoftTechnologies/VSoft.HttpClient",
-  "repositoryCommit": "#HASH#",
-  "license": "Apache-2.0",
-  "copyright": "Vincent Parrett and contributors",
-  "tags": "http client winhttp",
-  "readme": "README.md"
- },
- "targetPlatforms": [
-  {
-   "compiler": "XE2",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "XE3",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "XE4",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "XE5",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "XE6",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "XE7",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "XE8",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "10.0",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "10.1",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "10.2",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "10.3",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "10.4",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "11.0",
-   "platforms": "Win32, Win64",
-   "template": "default"
-  },
-  {
-   "compiler": "12.0",
-   "platforms": "Win32, Win64",
-   "template": "12+"
-  },
-  {
-   "compiler": "13.0",
-   "platforms": "Win32, Win64",
-   "template": "12+"
-  }
- ],
- "templates": [
-  {
-   "name": "12+",
-   "dependencies": [
-    {
-     "id": "VSoft.CancellationToken",
-     "version": "[0.1.4,]"
-    },
-    {
-     "id": "VSoft.Uri",
-     "version": "[0.3.3,]"
-    }
-   ],
-   "source": [
-    {
-     "src": "source\\*.pas",
-     "dest": "source",
-     "flatten": true
-    },
-    {
-     "src": "packages\\Rad Studio $compilerNoPoint$\\*.dpk",
-     "dest": "packages\\Rad Studio $compilerNoPoint$"
-    },
-    {
-     "src": "packages\\Rad Studio $compilerNoPoint$\\*.dproj",
-     "dest": "packages\\Rad Studio $compilerNoPoint$"
-    }
-   ],
-   "searchPaths": [
-    {
-     "path": "source"
-    }
-   ],
-   "build": [
-    {
-     "id": "Runtime",
-     "project": ".\\packages\\Rad Studio $compilerNoPoint$\\VSoft.HttpClientR.dproj",
-     "config": "Release"
-    }
-   ],
-   "runtime": [
-    {
-     "buildId": "Runtime",
-     "src": "bin\\VSoft.HttpClientR$LibSuffix$.bpl",
-     "copyLocal": true
-    }
-   ]
-  },
-  {
-   "name": "default",
-   "dependencies": [
-    {
-     "id": "VSoft.CancellationToken",
-     "version": "[0.1.4,]"
-    },
-    {
-     "id": "VSoft.Uri",
-     "version": "[0.3.3,]"
-    }
-   ],
-   "source": [
-    {
-     "src": "source\\*.pas",
-     "dest": "source",
-     "flatten": true
-    },
-    {
-     "src": "packages\\Rad Studio $compilerWithCodeName$\\*.dpk",
-     "dest": "packages\\Rad Studio $compilerWithCodeName$"
-    },
-    {
-     "src": "packages\\Rad Studio $compilerWithCodeName$\\*.dproj",
-     "dest": "packages\\Rad Studio $compilerWithCodeName$"
-    }
-   ],
-   "searchPaths": [
-    {
-     "path": "source"
-    }
-   ],
-   "build": [
-    {
-     "id": "Runtime",
-     "project": ".\\packages\\Rad Studio $compilerWithCodeName$\\VSoft.HttpClientR.dproj",
-     "config": "Release"
-    }
-   ],
-   "runtime": [
-    {
-     "buildId": "Runtime",
-     "src": "bin\\VSoft.HttpClientR$LibSuffix$.bpl",
-     "copyLocal": true
-    }
-   ]
-  }
- ]
-}
+# DPM package spec file
+# Used to build packages
+
+min client version: 1.0
+# metadata describes the package to the user
+metadata:
+  id: VSoft.HttpClient
+  authors: [Vincent Parrett]
+  description: WinHttp http client
+  projectUrl: https://github.com/VSoftTechnologies/VSoft.HttpClient
+  repositoryUrl: https://github.com/VSoftTechnologies/VSoft.HttpClient
+  license: Apache-2.0
+  readme: README.md
+  copyright: Vincent Parrett and contributors
+  tags: [WinHttp, http, client, rest]
+  version: 2.8.0
+  repositoryCommit: #HASH#
+
+# define variable defaults - can be overriden in targetPlatforms
+variables:
+  packageSource: "Rad Studio $compilernoprefix$"
+
+targetPlatforms:
+  - compiler from: delphixe2
+    compiler to: delphi13.0
+    platforms: [win32, win64]
+
+templates:
+  - name: default
+    dependencies:
+      - id: VSoft.CancellationToken
+        version: "[0.1.4,]"
+      - id: VSoft.Uri
+        version: "[0.3.3,]"
+
+    source:
+      - src: ./LICENSE.txt
+      - src: ./source/*.pas
+      - src: ./packages/$packageSource$/*.dpk
+        dest: ./packages/$packageSource$
+      - src: ./packages/$packageSource$/*.dproj
+        dest: ./packages/$packageSource$
+    build:
+      - project: ./packages/$packageSource$/VSoft.HttpClientR.dproj

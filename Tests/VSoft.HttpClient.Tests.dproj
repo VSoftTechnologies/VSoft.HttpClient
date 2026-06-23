@@ -1,4 +1,4 @@
-﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <PropertyGroup>
         <ProjectGuid>{FD3723C2-4B5F-4D30-91D0-4089C1F15D2A}</ProjectGuid>
         <ProjectVersion>20.3</ProjectVersion>
@@ -12,11 +12,11 @@
         <ProjectName Condition="'$(ProjectName)'==''">VSoft.HttpClient.Tests</ProjectName>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>XE7</DPMCompiler>
-        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\packages</DPMCache>
-        <DPM>$(DPMCache)\$(DPMCompiler)\$(Platform)</DPM>
-        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.DUnitX\0.4.4\src;$(DPM)\VSoft.CancellationToken\0.1.4\lib;</DPMSearch>
-        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.Uri\0.3.3\lib;$(DPM)\VSoft.DUnitX\0.4.4\src;$(DPM)\VSoft.CancellationToken\0.1.4\lib;</DPMSearch>
+        <DPMCompiler>delphixe2</DPMCompiler>
+        <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
+        <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
+        <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.DUnitX\0.5.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;</DPMSearch>
+        <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win64;$(DPM)\VSoft.DUnitX\0.5.0\lib\Win64;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;</DPMSearch>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -1001,6 +1001,12 @@
                 <PackageReference id="VSoft.DUnitX" version="0.4.4"/>
                 <PackageReference id="VSoft.Uri" version="0.3.3"/>
             </PackageReferences>
+            <Packages>
+                <PackageReference id="VSoft.CancellationToken" version="0.1.6" manifestHash="sha256:59d4968bebbc3d777581754dc567ffd713f23ccb296b4c58027df12612a59b00"/>
+                <PackageReference id="VSoft.DUnitX" version="0.5.0" manifestHash="sha256:a5f73243fe33744f7ed4b24565b948c26d385a5548726eb3aa068591c517ddb9"/>
+                <PackageReference id="VSoft.JsonDataObjects" version="0.3.2" manifestHash="sha256:c039c90011270bd7004818ae3036f5a3a399c4741de2d7c047594a0681e728e1"/>
+                <PackageReference id="VSoft.Uri" version="0.3.3" manifestHash="sha256:6599b8eab0199328c2ff31635af635d1880f7f62ec4433b9efd45bb416426709"/>
+            </Packages>
         </DPM>
     </ProjectExtensions>
     <Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>

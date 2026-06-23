@@ -69,6 +69,7 @@ type
   ['{6F143FFA-3F48-44C5-8462-4D8DF5B041BB}']
     function GetHeaders : TStrings;
     function GetParameters : TStrings;
+    function GetQueryParameters : TStrings;
     function GetUrlSegments : TStrings;
 
     function GetContentType: string;
@@ -129,7 +130,16 @@ type
     //If not, the Parameters will be sent as the body of the request in the form name1=value1&name2=value2.
     //Also, the request will be sent as application/x-www-form-urlencoded.
     //In both cases, name and value will automatically be url-encoded.
-    function WithParameter(const name : string; const value : string) : IHttpRequest;
+    //When encode is true (the default) the value is url-encoded when the request is assembled.
+    //Pass encode = false when the value is already encoded (or must be sent verbatim).
+    function WithParameter(const name : string; const value : string; const encode : boolean = true) : IHttpRequest;
+
+    //Unlike WithParameter, query parameters are ALWAYS appended to the url query string,
+    //regardless of the http method or whether files are attached. Use this when you need a
+    //query string parameter on a POST/PUT (e.g. a file upload). The name is always url-encoded;
+    //the value is url-encoded when encode is true (the default), and sent verbatim when false.
+    function WithQueryParameter(const name : string; const value : string; const encode : boolean = true) : IHttpRequest;
+
 
     // If you have files, we will send a multipart/form-data request. Your parameters will be part of this request
     function WithFile(const filePath : string; const fieldName : string = ''; const contentType : string = '') : IHttpRequest;
@@ -142,9 +152,10 @@ type
 
     function ForceFormData(const value : boolean = true) : IHttpRequest;
 
-    property Headers      : TStrings read GetHeaders;
-    property Parameters   : TStrings read GetParameters;
-    property UrlSegments  : TStrings read GetUrlSegments;
+    property Headers         : TStrings read GetHeaders;
+    property Parameters      : TStrings read GetParameters;
+    property QueryParameters : TStrings read GetQueryParameters;
+    property UrlSegments     : TStrings read GetUrlSegments;
 
     property Accept         : string read GetAccept write SetAccept;
     property AcceptEncoding : string read GetAcceptEncoding write setAcceptEncoding;

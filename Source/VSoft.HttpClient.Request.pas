@@ -27,6 +27,7 @@ type
     FHttpMethod : THttpMethod;
     FHeaders : TStringList;
     FRequestParams : TStringList;
+    FQueryParams : TStringList;
     FFiles : TStringList;
     FUrlSegments : TStringList;
     FContent : TStream;
@@ -45,6 +46,7 @@ type
   protected
     function GetHeaders : TStrings;
     function GetParameters : TStrings;
+    function GetQueryParameters : TStrings;
     function GetUrlSegments : TStrings;
 
     function GetContentType: string;
@@ -109,7 +111,11 @@ type
     //If not, the Parameters will be sent as the body of the request in the form name1=value1&name2=value2.
     //Also, the request will be sent as application/x-www-form-urlencoded.
     //In both cases, name and value will automatically be url-encoded.
-    function WithParameter(const name : string; const value : string) : IHttpRequest;
+    function WithParameter(const name : string; const value : string; const encode : boolean = true) : IHttpRequest;
+
+    //Unlike WithParameter, query parameters are ALWAYS appended to the url query string,
+    //regardless of the http method or whether files are attached.
+    function WithQueryParameter(const name : string; const value : string; const encode : boolean = true) : IHttpRequest;
 
     // If you have files, we will send a multipart/form-data request. Your parameters will be part of this request
     function WithFile(const filePath : string; const fieldName : string = ''; const contentType : string = '') : IHttpRequest;
@@ -123,9 +129,10 @@ type
     function ForceFormData(const value : boolean = true) : IHttpRequest;
 
 
-    property Headers      : TStrings read GetHeaders;
-    property Parameters   : TStrings read GetParameters;
-    property UrlSegments  : TStrings read GetUrlSegments;
+    property Headers         : TStrings read GetHeaders;
+    property Parameters      : TStrings read GetParameters;
+    property QueryParameters : TStrings read GetQueryParameters;
+    property UrlSegments     : TStrings read GetUrlSegments;
 
     property Accept         : string read GetAccept write SetAccept;
     property AcceptEncoding : string read GetAcceptEncoding write setAcceptEncoding;
@@ -153,6 +160,37 @@ uses
   System.StrUtils,
   VSoft.HttpClient.MultipartFormData;
 
+//Sentinel stored in TStrings.Objects to flag whether a value should be url-encoded when the
+//request is assembled. A non-nil object means "encode"; nil means "send verbatim".
+const
+  cEncodeFlag : TObject = TObject(1);
+
+//TStringList.Values[name] := '' deletes the entry, which means an empty value cannot be
+//stored. We set the name=value line directly to allow empty values while preserving the
+//overwrite-by-name semantics (a duplicate name replaces the existing entry). The encode flag
+//is stashed in the matching Objects slot so the value is (or isn't) encoded at assembly time.
+procedure SetNameValue(const list : TStringList; const name : string; const value : string; const encode : boolean = true);
+var
+  idx : integer;
+begin
+  idx := list.IndexOfName(name);
+  if idx < 0 then
+    idx := list.Add(name + list.NameValueSeparator + value)
+  else
+    list[idx] := name + list.NameValueSeparator + value;
+  if encode then
+    list.Objects[idx] := cEncodeFlag
+  else
+    list.Objects[idx] := nil;
+end;
+
+//True when the value at the given index should be url-encoded. Entries are tagged when added
+//via WithParameter/WithQueryParameter (cEncodeFlag for encode=true, nil for encode=false).
+function ShouldEncodeValue(const list : TStrings; const index : integer) : boolean;
+begin
+  result := list.Objects[index] <> nil;
+end;
+
 { TRequest }
 
 
@@ -165,14 +203,18 @@ begin
   FFiles := TStringlist.Create;
   FHeaders := TStringList.Create;
   FRequestParams := TStringList.Create;
+  FQueryParams := TStringList.Create;
   FUrlSegments := TStringList.Create;
   FFollowRedirects := true;
   FAllowHttpDowngrade := false;
 
+  //query params embedded in the uri are always part of the url, so treat them as query
+  //parameters - that way they survive on a POST/PUT (e.g. a file upload) rather than
+  //being absorbed into the request body.
   if Length(uri.QueryParams) > 0 then
   begin
     for queryParam in uri.QueryParams do
-      WithParameter(queryParam.Name, queryParam.Value);
+      WithQueryParameter(queryParam.Name, queryParam.Value);
   end;
   FConnectionTimeout := client.ConnectionTimeout;
   FSendTimeout := client.SendTimeout;
@@ -222,6 +264,7 @@ begin
   FFiles.Free;
   FHeaders.Free;
   FRequestParams.Free;
+  FQueryParams.Free;
   FUrlSegments.Free;
   if FContent <> nil then
     FContent.Free;
@@ -299,7 +342,11 @@ begin
     begin
       if i > 0 then
         sBody := sBody + '&';
-      sBody := sBody + UrlEncode(FRequestParams.Names[i]) + '=' + UrlEncode(FRequestParams.ValueFromIndex[i]);
+      sBody := sBody + UrlEncode(FRequestParams.Names[i]) + '=';
+      if ShouldEncodeValue(FRequestParams, i) then
+        sBody := sBody + UrlEncode(FRequestParams.ValueFromIndex[i])
+      else
+        sBody := sBody + FRequestParams.ValueFromIndex[i];
     end;
 
     FContent := TStringStream.Create(sBody, TEncoding.UTF8);
@@ -366,6 +413,11 @@ end;
 function TRequest.GetParameters: TStrings;
 begin
   result := FRequestParams;
+end;
+
+function TRequest.GetQueryParameters: TStrings;
+begin
+  result := FQueryParams;
 end;
 
 
@@ -563,16 +615,22 @@ begin
   FHeaders.Values[name] := value;
 end;
 
-function TRequest.WithParameter(const name, value: string): IHttpRequest;
+function TRequest.WithParameter(const name, value: string; const encode : boolean): IHttpRequest;
 begin
   result := Self;
-  FRequestParams.Values[name] := value;
+  SetNameValue(FRequestParams, name, value, encode);
+end;
+
+function TRequest.WithQueryParameter(const name, value: string; const encode : boolean): IHttpRequest;
+begin
+  result := Self;
+  SetNameValue(FQueryParams, name, value, encode);
 end;
 
 function TRequest.AddUrlSegement(const name, value: string): IHttpRequest;
 begin
   result := Self;
-  FUrlSegments.Values[name] := value;
+  SetNameValue(FUrlSegments, name, value);
 end;
 
 

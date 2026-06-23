@@ -405,30 +405,48 @@ end;
 function THttpClient.GetResourceFromRequest(const request: IHttpRequest): string;
 var
   i : integer;
+  queryStarted : boolean;
+
+  //encode is false when the caller supplied an already-encoded (or verbatim) value via
+  //WithParameter/WithQueryParameter - the flag is carried in the Objects slot of the list.
+  procedure AppendParam(const name, value : string; const encode : boolean);
+  begin
+    if not queryStarted then
+    begin
+      result := result + '?';
+      queryStarted := true;
+    end
+    else
+      result := result + '&';
+    result := result + UrlEncode(name) + '=';
+    if encode then
+      result := result + UrlEncode(value)
+    else
+      result := result + value;
+  end;
+
 begin
   result := request.Resource;
-  if request.HttpMethod <> THttpMethod.GET then
-      exit;
+  queryStarted := false;
 
-  //for get request, we use the parameters
-
+  //url segments apply to all methods - replace {placeholder} values in the resource.
   if request.UrlSegments.Count > 0 then
   begin
     for i := 0 to request.UrlSegments.Count -1 do
       result := StringReplace(result, '{' + request.UrlSegments.Names[i] + '}', request.UrlSegments.ValueFromIndex[i], [rfReplaceAll,rfIgnoreCase]);
   end;
 
-  if request.Parameters.Count > 0 then
+  //for get requests, WithParameter values go on the query string (restsharp semantics).
+  //for other methods they are sent in the body (see TRequest.GetBody).
+  if request.HttpMethod = THttpMethod.GET then
   begin
     for i := 0 to request.Parameters.Count -1 do
-    begin
-      if i = 0 then
-        result := result + '?'
-      else
-        result := result + '&';
-      result := result + UrlEncode(request.Parameters.Names[i]) + '=' + UrlEncode(request.Parameters.ValueFromIndex[i]);
-    end;
+      AppendParam(request.Parameters.Names[i], request.Parameters.ValueFromIndex[i], request.Parameters.Objects[i] <> nil);
   end;
+
+  //query parameters always go on the query string, regardless of method.
+  for i := 0 to request.QueryParameters.Count -1 do
+    AppendParam(request.QueryParameters.Names[i], request.QueryParameters.ValueFromIndex[i], request.QueryParameters.Objects[i] <> nil);
 end;
 
 function THttpClient.GetRequestUrl(const request : IHttpRequest) : string;
