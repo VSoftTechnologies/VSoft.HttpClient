@@ -12,11 +12,12 @@
         <ProjectName Condition="'$(ProjectName)'==''">VSoft.HttpClient.Tests</ProjectName>
     </PropertyGroup>
     <PropertyGroup>
-        <DPMCompiler>delphixe2</DPMCompiler>
+        <DPMCompiler>delphixe7</DPMCompiler>
         <DPMCache Condition="'$(DPMCache)' == ''">$(APPDATA)\.dpm\package_cache</DPMCache>
         <DPM>$(DPMCache)\$(DPMCompiler)</DPM>
         <DPMSearch Condition="'$(Platform)'=='Win32'">$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win32;$(DPM)\VSoft.DUnitX\0.5.0\lib\Win32;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win32;$(DPM)\VSoft.Uri\0.3.3\lib\Win32;</DPMSearch>
         <DPMSearch Condition="'$(Platform)'=='Win64'">$(DPM)\VSoft.CancellationToken\0.1.6\lib\Win64;$(DPM)\VSoft.DUnitX\0.5.0\lib\Win64;$(DPM)\VSoft.JsonDataObjects\0.3.2\lib\Win64;$(DPM)\VSoft.Uri\0.3.3\lib\Win64;</DPMSearch>
+        <DPMExe>I:\Github\DelphiPackageManager\DPMMaster\Output\dpm.exe</DPMExe>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Config)'=='Base' or '$(Base)'!=''">
         <Base>true</Base>
@@ -1002,14 +1003,15 @@
                 <PackageReference id="VSoft.Uri" version="0.3.3"/>
             </PackageReferences>
             <Packages>
-                <PackageReference id="VSoft.CancellationToken" version="0.1.6" manifestHash="sha256:59d4968bebbc3d777581754dc567ffd713f23ccb296b4c58027df12612a59b00"/>
-                <PackageReference id="VSoft.DUnitX" version="0.5.0" manifestHash="sha256:a5f73243fe33744f7ed4b24565b948c26d385a5548726eb3aa068591c517ddb9"/>
-                <PackageReference id="VSoft.JsonDataObjects" version="0.3.2" manifestHash="sha256:c039c90011270bd7004818ae3036f5a3a399c4741de2d7c047594a0681e728e1"/>
-                <PackageReference id="VSoft.Uri" version="0.3.3" manifestHash="sha256:6599b8eab0199328c2ff31635af635d1880f7f62ec4433b9efd45bb416426709"/>
+                <PackageReference id="VSoft.CancellationToken" version="0.1.6" manifestHash="sha256:6dbb4343805499681ccf1afd81405a04e4e737c8029b05b3850a3bb475728267"/>
+                <PackageReference id="VSoft.DUnitX" version="0.5.0" manifestHash="sha256:77e4cb64183cc31bd64b7cf9cb1a84cbc00b979c6d4de81c5389f09146099ede"/>
+                <PackageReference id="VSoft.JsonDataObjects" version="0.3.2" manifestHash="sha256:047c65d4f930fea8b32ff8e8b0e2111efad02b244b5c699dec88f77e004f911d"/>
+                <PackageReference id="VSoft.Uri" version="0.3.3" manifestHash="sha256:88e9c93fa7383bfa9e03c471104e8a9b40d5eabb2bc32d3ac8c0fd0e4992c9de"/>
             </Packages>
         </DPM>
     </ProjectExtensions>
     <Import Condition="Exists('$(BDS)\Bin\CodeGear.Delphi.Targets')" Project="$(BDS)\Bin\CodeGear.Delphi.Targets"/>
     <Import Condition="Exists('$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj')" Project="$(APPDATA)\Embarcadero\$(BDSAPPDATABASEDIR)\$(PRODUCTVERSION)\UserTools.proj"/>
     <Import Condition="Exists('$(MSBuildProjectName).deployproj')" Project="$(MSBuildProjectName).deployproj"/>
+    <Import Project="$(DPMCache)\DPM.CopyLocal.targets" Condition="Exists('$(DPMCache)\DPM.CopyLocal.targets')"/>
 </Project>

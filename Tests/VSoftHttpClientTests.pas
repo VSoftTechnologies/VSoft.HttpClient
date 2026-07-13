@@ -56,6 +56,12 @@ type
     procedure ClientErrorToStringPrefixesMessage;
     [Test]
     procedure ClientErrorToStringFormatsUnknownCode;
+    [Test]
+    procedure SecureFailureFlagsToStringDecodesSingleFlag;
+    [Test]
+    procedure SecureFailureFlagsToStringJoinsMultipleFlags;
+    [Test]
+    procedure SecureFailureFlagsToStringFormatsUnknownFlag;
   end;
 
   //offline tests for request building - parameters, query parameters, headers,
@@ -563,6 +569,24 @@ end;
 procedure THelperFunctionTests.ClientErrorToStringFormatsUnknownCode;
 begin
   Assert.AreEqual('x: Unknown Error 0x000000FE', ClientErrorToString('x', $FE));
+end;
+
+procedure THelperFunctionTests.SecureFailureFlagsToStringDecodesSingleFlag;
+begin
+  Assert.AreEqual('the certificate host name (CN) does not match the requested host',
+    SecureFailureFlagsToString(WINHTTP_CALLBACK_STATUS_FLAG_CERT_CN_INVALID));
+end;
+
+procedure THelperFunctionTests.SecureFailureFlagsToStringJoinsMultipleFlags;
+begin
+  //bits are reported in a fixed order (date, then CN) regardless of input order.
+  Assert.AreEqual('the certificate is expired or not yet valid; the certificate host name (CN) does not match the requested host',
+    SecureFailureFlagsToString(WINHTTP_CALLBACK_STATUS_FLAG_CERT_CN_INVALID or WINHTTP_CALLBACK_STATUS_FLAG_CERT_DATE_INVALID));
+end;
+
+procedure THelperFunctionTests.SecureFailureFlagsToStringFormatsUnknownFlag;
+begin
+  Assert.AreEqual('unknown secure failure (0x00000100)', SecureFailureFlagsToString($100));
 end;
 
 

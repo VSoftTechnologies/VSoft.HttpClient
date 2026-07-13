@@ -42,6 +42,7 @@ type
     FLastReceiveBlockSize : DWORD;
     FBytesWritten : DWORD;
     FClientError : DWORD;
+    FSecureFailureFlags : DWORD;
     FUseHttp2 : boolean;
     FEnableTLS1_3 : boolean;
     FEnableCertificateRevocationCheck : boolean;
@@ -653,6 +654,13 @@ var
 begin
   case dwInternetStatus of
 
+    WINHTTP_CALLBACK_STATUS_SECURE_FAILURE :
+    begin
+       //capture the specific cert failure bit flags. WinHTTP will still follow up
+       //with a REQUEST_ERROR (ERROR_WINHTTP_SECURE_FAILURE), so do NOT signal here.
+       FSecureFailureFlags := PDWORD(lpvStatusInformation)^;
+    end;
+
     WINHTTP_CALLBACK_STATUS_REQUEST_ERROR :
     begin
        FClientError := PWinHttpAsyncResult(lpvStatusInformation)^.dwError;
@@ -819,6 +827,7 @@ var
   hr : DWORD;
   tlsProtocols : DWORD;
   waitTimeout : DWORD;
+  errMsg : string;
 
 
 begin
@@ -827,6 +836,7 @@ begin
   try
     result := nil;
     FClientError := 0;
+    FSecureFailureFlags := 0;
     FLastStatusCode := 0;
     FProxyAuthScheme := 0;
     FLastReceiveBlockSize := 0;
@@ -906,7 +916,7 @@ begin
 
 
         //set timeouts on the request.
-      pCallback := WinHttpSetStatusCallback(hRequest, _HTTPCallback, WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS + WINHTTP_CALLBACK_FLAG_REDIRECT, 0);
+      pCallback := WinHttpSetStatusCallback(hRequest, _HTTPCallback, WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS + WINHTTP_CALLBACK_FLAG_REDIRECT + WINHTTP_CALLBACK_FLAG_SECURE_FAILURE, 0);
 
       if Assigned(pCallBack) then
         raise Exception.Create('Callback was already set!');
@@ -969,7 +979,10 @@ begin
           //if all is ok, then return the response.
           if FClientError <> 0 then
           begin
-            raise EHttpClientException.Create(ClientErrorToString('',FClientError), FClientError);
+            errMsg := ClientErrorToString('',FClientError);
+            if (FClientError = ERROR_WINHTTP_SECURE_FAILURE) and (FSecureFailureFlags <> 0) then
+              errMsg := errMsg + ' (' + SecureFailureFlagsToString(FSecureFailureFlags) + ')';
+            raise EHttpClientException.Create(errMsg, FClientError);
             //raise exception?
           end;
 

@@ -6,6 +6,7 @@ uses
   System.Classes,
   System.SysUtils,
   System.Typinfo,
+  WinAPI.Windows,
   VSoft.CancellationToken,
   VSoft.Uri;
 
@@ -324,6 +325,10 @@ type
 
   function ClientErrorToString(const message : string; const value : HRESULT) : string;
 
+  //Decodes a WINHTTP_CALLBACK_STATUS_SECURE_FAILURE bitmask (WINHTTP_CALLBACK_STATUS_FLAG_*)
+  //into a human readable, '; ' separated list of the specific cert/TLS problems.
+  function SecureFailureFlagsToString(const flags : DWORD) : string;
+
 const
   cAcceptHeader = 'Accept';
   cAcceptCharsetHeader = 'Accept-Charset';
@@ -453,6 +458,38 @@ begin
 
   result := message + ': ' + result;
 
+end;
+
+function SecureFailureFlagsToString(const flags : DWORD) : string;
+
+  procedure AddReason(const reason : string);
+  begin
+    if result <> '' then
+      result := result + '; ';
+    result := result + reason;
+  end;
+
+begin
+  result := '';
+  if (flags and WINHTTP_CALLBACK_STATUS_FLAG_CERT_DATE_INVALID) <> 0 then
+    AddReason('the certificate is expired or not yet valid');
+  if (flags and WINHTTP_CALLBACK_STATUS_FLAG_CERT_CN_INVALID) <> 0 then
+    AddReason('the certificate host name (CN) does not match the requested host');
+  if (flags and WINHTTP_CALLBACK_STATUS_FLAG_INVALID_CA) <> 0 then
+    AddReason('the certificate was issued by an untrusted certificate authority');
+  if (flags and WINHTTP_CALLBACK_STATUS_FLAG_CERT_REV_FAILED) <> 0 then
+    AddReason('certificate revocation could not be checked (revocation server offline)');
+  if (flags and WINHTTP_CALLBACK_STATUS_FLAG_CERT_REVOKED) <> 0 then
+    AddReason('the certificate has been revoked');
+  if (flags and WINHTTP_CALLBACK_STATUS_FLAG_INVALID_CERT) <> 0 then
+    AddReason('the certificate is invalid');
+  if (flags and WINHTTP_CALLBACK_STATUS_FLAG_CERT_WRONG_USAGE) <> 0 then
+    AddReason('the certificate is not valid for this usage');
+  if (flags and WINHTTP_CALLBACK_STATUS_FLAG_SECURITY_CHANNEL_ERROR) <> 0 then
+    AddReason('an error occurred in the secure channel');
+
+  if result = '' then
+    result := 'unknown secure failure (0x' + IntToHex(flags, 8) + ')';
 end;
 
 
