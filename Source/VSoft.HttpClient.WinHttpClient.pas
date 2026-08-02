@@ -986,7 +986,7 @@ begin
             //raise exception?
           end;
 
-          result := FResponse;
+          result := FResponse as IHttpResponse;
           FResponse := nil;
         end;
         WAIT_OBJECT_1 :

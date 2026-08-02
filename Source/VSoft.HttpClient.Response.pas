@@ -35,7 +35,11 @@ uses
   VSoft.HttpClient;
 
 type
-  IHttpResponseInternal = interface(IHttpResponse)
+  //NOTE : No {$M+} here on purpose. This interface is internal to the library and is
+  //never mocked - and XE2 cannot generate method RTTI for TBytes (= TArray<System.Byte>)
+  //parameters (E2134 'has no type info'). IHttpResponse (the interface consumers mock)
+  //already has RTTI, since it is declared inside the {$M+} region in VSoft.HttpClient.pas.
+  IHttpResponseInternal = interface
   ['{CD23F38C-69E8-40F5-99B6-6308B57C2F34}']
     procedure SetContent(const stream : TStream);
     procedure SetHeaders(const rawHeaders : string);

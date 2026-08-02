@@ -28,6 +28,11 @@ type
   THttpAuthType = (None, Basic, NegotiateOrNtlm);
   THttpMethod = (GET,POST, PUT, PATCH, DELETE);
 
+//Interfaces are declared with {$M+} so that they have method RTTI. This allows them
+//to be mocked (eg with Delphi.Mocks) in consumer unit tests. The region is closed off
+//with {$M-} before the first class declaration below, so that no class in this unit
+//(or descending from one) gets published section RTTI it doesn't need.
+{$M+}
 type
   IContentDisposition = interface
   ['{BC849CF0-F39F-4258-9964-C6A48FC9F0C2}']
@@ -177,7 +182,7 @@ type
   end;
 
 
-
+  {$M-}
   IRestSerializer = interface
   ['{80EFB40E-4D10-4E8C-8C61-D2E663391913}']
     function GetSupportedContentTypes : TArray<string>;
@@ -185,7 +190,7 @@ type
     function Serialize(const obj : TObject) : string;
     property SupportedContentTypes : TArray<string> read GetSupportedContentTypes;
   end;
-
+  {$M+}
 
   IHttpClientInternal = interface
   ['{1F09A9A8-A32E-41F3-811B-BA7D5B352185}']
@@ -294,6 +299,8 @@ type
     property EnableCertificateRevocationCheck : boolean read GetEnableCertificateRevocationCheck write SetEnableCertificateRevocationCheck;
 
   end;
+
+{$M-}
 
   THttpClientFactory = class
   private
