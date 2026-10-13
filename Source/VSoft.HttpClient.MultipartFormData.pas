@@ -65,6 +65,7 @@ implementation
 uses
   System.SysUtils,
   System.StrUtils,
+  System.SyncObjs,
   System.Win.Registry,
   WinApi.Windows,
   System.Generics.Collections,
@@ -75,6 +76,8 @@ type
   private
     class var
       FMimeTypes : TDictionary<string, string>;
+      FMimeTypesLock : TCriticalSection;
+      FMimeTypesLoaded : boolean;
   private
     FDataStream: TMemoryStream;
     FBoundary : string;
@@ -93,6 +96,7 @@ type
 
     class procedure AddDefaultMimeTypes;
     class procedure AddWindowsMimeTypes;
+    class procedure EnsureMimeTypesLoaded;
     class constructor Create;
     class destructor Destroy;
   public
@@ -863,11 +867,9 @@ end;
 
 class constructor TMultipartFormData.Create;
 begin
-  FMimeTypes := TDictionary<string, string>.Create;
-  AddDefaultMimeTypes;
-  AddWindowsMimeTypes;
-
-
+  //Note : the mime types are not loaded here as that is expensive (large table + registry scan)
+  //and would slow down application startup - see EnsureMimeTypesLoaded.
+  FMimeTypesLock := TCriticalSection.Create;
 end;
 
 constructor TMultipartFormData.Create;
@@ -879,6 +881,7 @@ end;
 class destructor TMultipartFormData.Destroy;
 begin
   FMimeTypes.Free;
+  FMimeTypesLock.Free;
 end;
 
 destructor TMultipartFormData.Destroy;
@@ -886,6 +889,30 @@ begin
   if FDataStream <> nil then
     FDataStream.Free;
   inherited;
+end;
+
+class procedure TMultipartFormData.EnsureMimeTypesLoaded;
+begin
+  if FMimeTypesLoaded then
+    exit;
+  FMimeTypesLock.Acquire;
+  try
+    //another thread may have loaded them while we were waiting on the lock.
+    if FMimeTypesLoaded then
+      exit;
+    FMimeTypes := TDictionary<string, string>.Create;
+    try
+      AddDefaultMimeTypes;
+      AddWindowsMimeTypes;
+    except
+      FreeAndNil(FMimeTypes);
+      raise;
+    end;
+    //must be set last, other threads test this without taking the lock.
+    FMimeTypesLoaded := true;
+  finally
+    FMimeTypesLock.Release;
+  end;
 end;
 
 function TMultipartFormData.Generate: TStream;
@@ -928,6 +955,13 @@ var
   ext : string;
 begin
   ext := LowerCase(ExtractFileExt(fileName));
+  if ext = '' then
+  begin
+    //no extension to look up, so don't bother loading the mime types.
+    result := 'application/octet-stream';
+    exit;
+  end;
+  EnsureMimeTypesLoaded;
   if not TMultipartFormData.FMimeTypes.TryGetValue(ext, result) then
     result := 'application/octet-stream';//default to this if we can't figure it out.
 end;

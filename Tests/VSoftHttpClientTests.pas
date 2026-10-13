@@ -194,6 +194,12 @@ type
     [Test]
     procedure AddStreamFallsBackToOctetStream;
     [Test]
+    procedure AddStreamLooksUpContentTypeFromFileName;
+    [Test]
+    procedure AddStreamLookupIsRepeatable;
+    [Test]
+    procedure AddStreamWithoutFileNameFallsBackToOctetStream;
+    [Test]
     procedure MultipleFieldsAreWritten;
     [Test]
     procedure BoundaryStartsWithDashes;
@@ -1284,6 +1290,65 @@ begin
   end;
   content := GenerateToString(formData);
   Assert.IsTrue(ContainsStr(content, 'Content-Type: application/octet-stream'), content);
+end;
+
+procedure TMultipartFormDataTests.AddStreamLooksUpContentTypeFromFileName;
+var
+  formData : IMultipartFormDataGenerator;
+  source : TStringStream;
+  content : string;
+begin
+  formData := TMultipartFormDataFactory.Create;
+  source := TStringStream.Create('hello', TEncoding.UTF8);
+  try
+    //known extension and no explicit content type => looked up in the mime types (which are loaded on first use)
+    formData.AddStream('field', source, 'thing.TXT');
+  finally
+    source.Free;
+  end;
+  content := GenerateToString(formData);
+  Assert.IsTrue(ContainsStr(content, 'Content-Type: text/plain'), content);
+end;
+
+procedure TMultipartFormDataTests.AddStreamLookupIsRepeatable;
+var
+  formData : IMultipartFormDataGenerator;
+  source : TStringStream;
+  content : string;
+  i : integer;
+begin
+  //the mime types are only loaded once, subsequent lookups (from any instance) must still work.
+  for i := 1 to 3 do
+  begin
+    formData := TMultipartFormDataFactory.Create;
+    source := TStringStream.Create('hello', TEncoding.UTF8);
+    try
+      formData.AddStream('field', source, 'thing.htm');
+    finally
+      source.Free;
+    end;
+    content := GenerateToString(formData);
+    Assert.IsTrue(ContainsStr(content, 'Content-Type: text/html'), content);
+  end;
+end;
+
+procedure TMultipartFormDataTests.AddStreamWithoutFileNameFallsBackToOctetStream;
+var
+  formData : IMultipartFormDataGenerator;
+  source : TStringStream;
+  content : string;
+begin
+  formData := TMultipartFormDataFactory.Create;
+  source := TStringStream.Create('hello', TEncoding.UTF8);
+  try
+    //no file name and no explicit content type => nothing to look up.
+    formData.AddStream('field', source);
+  finally
+    source.Free;
+  end;
+  content := GenerateToString(formData);
+  Assert.IsTrue(ContainsStr(content, 'Content-Type: application/octet-stream'), content);
+  Assert.IsFalse(ContainsStr(content, 'filename='), content);
 end;
 
 procedure TMultipartFormDataTests.MultipleFieldsAreWritten;
