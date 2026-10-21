@@ -35,6 +35,7 @@ type
     FProxyBypass : string;
 
     FWaitEvent : TEvent;
+    FRequestClosedEvent : TEvent;
     FCurrentRequest : IHttpRequest;
     FResponse : IHttpResponseInternal;
     FReceiveBuffer : TBytes;
@@ -155,6 +156,10 @@ uses
 
 //TODO : What is the optimum buffer size?
 const cReceiveBufferSize : DWORD = 32 * 1024;
+
+//how long Send waits for winhttp to finish with a closed request handle. HANDLE_CLOSING should always
+//arrive, this just stops a missing notification from hanging the caller forever.
+const cRequestClosedTimeout : DWORD = 30 * 1000;
 
 //const E_UNEXPECTED = HRESULT($8000FFFF);
 
@@ -315,6 +320,7 @@ begin
   FUri := uri;
   FUserAgent := 'VSoft.HttpClient';
   FWaitEvent := TEvent.Create(nil, false, false, '');
+  FRequestClosedEvent := TEvent.Create(nil, true, false, '');
   FRequestLock := TCriticalSection.Create;
   FEnableTLS1_3 := false;
 end;
@@ -334,6 +340,7 @@ begin
   if FSession <> nil then
     WinHttpCloseHandle(FSession);
   FWaitEvent.Free;
+  FRequestClosedEvent.Free;
   FRequestLock.Free;
 
   inherited;
@@ -767,6 +774,13 @@ begin
       FWaitEvent.SetEvent; //unblock
     end;
 
+    WINHTTP_CALLBACK_STATUS_HANDLE_CLOSING :
+    begin
+      //the last callback winhttp makes for the request handle - Send waits for this before it releases
+      //anything the callbacks use.
+      FRequestClosedEvent.SetEvent;
+    end;
+
   end;
 end;
 
@@ -831,6 +845,8 @@ var
   tlsProtocols : DWORD;
   waitTimeout : DWORD;
   errMsg : string;
+  contextValue : NativeUInt;
+  callbackSet : boolean;
 
 
 begin
@@ -838,6 +854,11 @@ begin
     raise Exception.Create('A request is in progress.. winhttp is not reentrant!');
   try
     result := nil;
+    callbackSet := false;
+    //a callback from a previous request that was cancelled or timed out may have signalled the event after we
+    //stopped waiting on it.
+    FWaitEvent.ResetEvent;
+    FRequestClosedEvent.ResetEvent;
     FClientError := 0;
     FSecureFailureFlags := 0;
     FLastStatusCode := 0;
@@ -919,10 +940,20 @@ begin
 
 
         //set timeouts on the request.
-      pCallback := WinHttpSetStatusCallback(hRequest, _HTTPCallback, WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS + WINHTTP_CALLBACK_FLAG_REDIRECT + WINHTTP_CALLBACK_FLAG_SECURE_FAILURE, 0);
+      //winhttp only sends HANDLE_CLOSING for a handle that has a context value, so set it now rather than
+      //relying on WinHttpSendRequest - we might fail before we get that far.
+      contextValue := NativeUInt(Pointer(Self));
+      if not WinHttpSetOption(hRequest, WINHTTP_OPTION_CONTEXT_VALUE, @contextValue, SizeOf(contextValue)) then
+      begin
+        FClientError := GetLastError;
+        raise EHttpClientException.Create(ClientErrorToString('Error setting request context', FClientError), FClientError);
+      end;
+
+      pCallback := WinHttpSetStatusCallback(hRequest, _HTTPCallback, WINHTTP_CALLBACK_FLAG_ALL_COMPLETIONS + WINHTTP_CALLBACK_FLAG_REDIRECT + WINHTTP_CALLBACK_FLAG_SECURE_FAILURE + WINHTTP_CALLBACK_FLAG_HANDLES, 0);
 
       if Assigned(pCallBack) then
         raise Exception.Create('Callback was already set!');
+      callbackSet := true;
 
       FDataLength := request.ContentLength;    //need to do this before configurerequest as if there are files it will set the content type.
 
@@ -990,28 +1021,32 @@ begin
           end;
 
           result := FResponse as IHttpResponse;
-          FResponse := nil;
         end;
         WAIT_OBJECT_1 :
         begin
           //cancellation token triggered - hRequest will be closed in finally block
-          FResponse := nil;
           raise EHttpClientException.Create('Request cancelled', ERROR_WINHTTP_OPERATION_CANCELLED);
         end;
         WAIT_TIMEOUT :
         begin
           //timed out, clean up and return.
-          FResponse := nil;
           raise EHttpClientException.Create(ClientErrorToString('Timed out', ERROR_WINHTTP_TIMEOUT), ERROR_WINHTTP_TIMEOUT);
         end;
       end;
       finally
         WinHttpCloseHandle(hRequest);
+        //we are async, so winhttp can still call back after the handle is closed - eg a read that was in flight
+        //when we were cancelled or timed out, or a callback that is still running after it signalled us. Wait
+        //for HANDLE_CLOSING (always the last callback) before releasing anything the callbacks use - including
+        //Self, which the caller may free as soon as we return.
+        if callbackSet then
+          FRequestClosedEvent.WaitFor(cRequestClosedTimeout);
       end;
     finally
       WinHttpCloseHandle(hConnection);
    end;
   finally
+    FResponse := nil;
     FCurrentRequest := nil;
     SetLength(FReceiveBuffer, 0);
     SetLength(FWriteBuffer, 0);

@@ -2,13 +2,13 @@
 min dpm client version: 1.0.0
 metadata:
   id: VSoft.HttpClient
-  version: 2.12.0
+  version: 2.13.0
   description: WinHttp http client
   authors:
     - Vincent Parrett
   projectUrl: https://github.com/VSoftTechnologies/VSoft.HttpClient
   repositoryUrl: https://github.com/VSoftTechnologies/VSoft.HttpClient
-  repositoryCommit: #HASH#
+  repositoryCommit: 21aa1367ce656a25586f51ea1306b6cc9c561b99
   license: Apache-2.0
   copyright: Vincent Parrett and contributors
   tags:
@@ -29,9 +29,9 @@ templates:
   - name: default
     dependencies:
       - id: VSoft.CancellationToken
-        version: "[0.1.4,]"
+        version: '[0.1.4,]'
       - id: VSoft.Uri
-        version: "[0.3.3,]"
+        version: '[0.3.3,]'
     source:
       - src: ./LICENSE.txt
       - src: ./source/*.pas
