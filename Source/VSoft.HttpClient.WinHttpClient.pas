@@ -794,7 +794,10 @@ function THttpClient.ReadData(hRequest: HINTERNET; dataSize : DWORD): boolean;
 begin
 //  bufferSize := Min(dataSize + 2, cReceiveBufferSize);
   ZeroMemory(@FReceiveBuffer[0], cReceiveBufferSize);
-  result := WinHttpReadData(hRequest, FReceiveBuffer[0], cReceiveBufferSize , @FLastReceiveBlockSize);
+  //we are using winhttp asynchronously, so lpdwNumberOfBytesRead must be nil - the byte count comes from
+  //the READ_COMPLETE callback. Passing a pointer lets winhttp write the count later, possibly after this
+  //object has been freed, corrupting whatever has reused the memory.
+  result := WinHttpReadData(hRequest, FReceiveBuffer[0], cReceiveBufferSize , nil);
 end;
 
 
