@@ -8,7 +8,7 @@ metadata:
     - Vincent Parrett
   projectUrl: https://github.com/VSoftTechnologies/VSoft.HttpClient
   repositoryUrl: https://github.com/VSoftTechnologies/VSoft.HttpClient
-  repositoryCommit: 21aa1367ce656a25586f51ea1306b6cc9c561b99
+  repositoryCommit: "#HASH#"
   license: Apache-2.0
   copyright: Vincent Parrett and contributors
   tags:
