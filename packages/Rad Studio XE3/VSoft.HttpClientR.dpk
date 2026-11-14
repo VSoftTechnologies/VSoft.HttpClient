@@ -31,7 +31,9 @@ package VSoft.HttpClientR;
 {$IMPLICITBUILD OFF}
 
 requires
-  rtl;
+  rtl,
+  VSoft.CancellationTokenR,
+  VSoft.UriR;
 
 contains
   VSoft.HttpClient.Headers in '..\..\Source\VSoft.HttpClient.Headers.pas',

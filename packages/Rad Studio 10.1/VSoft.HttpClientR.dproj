@@ -77,6 +77,8 @@
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="rtl.dcp"/>
+        <DCCReference Include="VSoft.CancellationTokenR.dcp"/>
+        <DCCReference Include="VSoft.UriR.dcp"/>
         <DCCReference Include="..\..\Source\VSoft.HttpClient.Headers.pas"/>
         <DCCReference Include="..\..\Source\VSoft.HttpClient.MultipartFormData.pas"/>
         <DCCReference Include="..\..\Source\VSoft.HttpClient.pas"/>
